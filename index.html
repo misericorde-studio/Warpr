@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cercles de Particules Dynamiques - Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            width: 250px;
+            height: 100vh;
+            overflow: scroll;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        .value-display {
+            font-size: 11px;
+            text-align: right;
+        }
+        h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #00ffcc;
+        }
+        .control-section {
+            border-top: 1px solid rgba(0, 255, 204, 0.3);
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        button {
+            background-color: #00ffcc;
+            border: none;
+            color: #000;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        
+        /* Style pour les indicateurs de caméra */
+        #camera-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+            color: #00ffcc;
+            line-height: 1.5;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <!-- Ajout de l'indicateur de caméra -->
+    <div id="camera-info">
+        <div>Rotation X: <span id="rotation-x">0.00</span>°</div>
+        <div>Rotation Y: <span id="rotation-y">0.00</span>°</div>
+        <div>Rotation Z: <span id="rotation-z">0.00</span>°</div>
+        <div>Distance: <span id="camera-distance">0.00</span></div>
+        <button id="toggleCameraInfo" style="margin-top: 5px; font-size: 10px; padding: 3px 6px;">Masquer</button>
+    </div>
+    
+    <div id="controls">
+        <h3>Paramètres</h3>
+        
+        <div class="control-section">
+            <div class="control-group">
+                <label for="innerRadius">Rayon cercle intérieur</label>
+                <input type="range" id="innerRadius" min="0.5" max="4" step="0.1" value="2">
+                <div class="value-display" id="innerRadiusValue">2.00</div>
+            </div>
+            <div class="control-group">
+                <label for="outerRadius">Rayon cercle extérieur</label>
+                <input type="range" id="outerRadius" min="3" max="10" step="0.1" value="6">
+                <div class="value-display" id="outerRadiusValue">6.00</div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <div class="control-group">
+                <label for="baseParticleSize">Taille des particules</label>
+                <input type="range" id="baseParticleSize" min="0.1" max="1" step="0.05" value="0.4">
+                <div class="value-display" id="baseParticleSizeValue">0.40</div>
+            </div>
+            <div class="control-group">
+                <label for="maxParticleDistance">Distance maximale</label>
+                <input type="range" id="maxParticleDistance" min="0.5" max="5" step="0.1" value="3">
+                <div class="value-display" id="maxParticleDistanceValue">3.00</div>
+            </div>
+            <div class="control-group">
+                <label for="particleSpeed">Vitesse des particules</label>
+                <input type="range" id="particleSpeed" min="0.005" max="0.05" step="0.001" value="0.02">
+                <div class="value-display" id="particleSpeedValue">0.02</div>
+            </div>
+            <div class="control-group">
+                <label for="fadeWithDistance">Réduction de taille</label>
+                <input type="range" id="fadeWithDistance" min="0" max="1" step="0.05" value="0.8">
+                <div class="value-display" id="fadeWithDistanceValue">0.80</div>
+            </div>
+            <div class="control-group">
+                <label for="perspectiveEffect">Effet de perspective</label>
+                <input type="range" id="perspectiveEffect" min="0" max="1" step="0.05" value="0.4">
+                <div class="value-display" id="perspectiveEffectValue">0.40</div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <div class="control-group">
+                <label for="innerCircleParticles">Particules des cercles intérieurs</label>
+                <input type="range" id="innerCircleParticles" min="100" max="1000" step="50" value="500">
+                <div class="value-display" id="innerCircleParticlesValue">500</div>
+            </div>
+            <div class="control-group">
+                <label for="outerCircleParticles">Particules cercle extérieur</label>
+                <input type="range" id="outerCircleParticles" min="100" max="2000" step="50" value="1000">
+                <div class="value-display" id="outerCircleParticlesValue">1000</div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <div class="control-group">
+                <label for="innerCircleFill">Remplissage cercle intérieur</label>
+                <input type="range" id="innerCircleFill" min="0" max="1" step="0.05" value="0.9">
+                <div class="value-display" id="innerCircleFillValue">0.90</div>
+            </div>
+            <div class="control-group">
+                <label for="staticRingWidth">Largeur anneau statique extérieur</label>
+                <input type="range" id="staticRingWidth" min="0" max="1" step="0.05" value="0.5">
+                <div class="value-display" id="staticRingWidthValue">0.50</div>
+            </div>
+            <div class="control-group">
+                <label for="outerOutwardRatio">Direction particules mobiles</label>
+                <input type="range" id="outerOutwardRatio" min="0" max="1" step="0.05" value="0.6">
+                <div class="value-display" id="outerOutwardRatioValue">0.60</div>
+            </div>
+            <div class="control-group">
+                <label for="minMobileRatio">Ratio minimum particules mobiles</label>
+                <input type="range" id="minMobileRatio" min="0.1" max="0.7" step="0.05" value="0.3">
+                <div class="value-display" id="minMobileRatioValue">0.30</div>
+            </div>
+            <div class="control-group">
+                <label for="additionalCircleVerticalSpacing">Espacement vertical des cercles</label>
+                <input type="range" id="additionalCircleVerticalSpacing" min="0.2" max="2.0" step="0.1" value="0.5">
+                <div class="value-display" id="additionalCircleVerticalSpacingValue">0.50</div>
+            </div>
+        </div>
+        
+        <button id="hideControls">Masquer</button>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

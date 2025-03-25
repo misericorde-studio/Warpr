@@ -31,6 +31,15 @@ const config = {
     additionalCircles: 4,      // Nombre de cercles supplémentaires
     additionalCircleParticles: 100, // Nombre de particules par cercle supplémentaire (même que innerCircleParticles)
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
+    
+    // Configuration pour l'animation de division
+    splitAnimation: {
+        gridSize: 3, // 3x3 grid
+        spacing: 1.2, // Espacement entre les cercles
+        particleSpread: 0.3, // Facteur de dispersion des particules
+        transitionDuration: 1.0, // Durée de la transition
+        active: false // État de l'animation
+    }
 };
 
 // Configuration de la caméra avec un champ de vision adapté
@@ -39,9 +48,13 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 // Configuration de l'animation au scroll
 const scrollConfig = {
     startRotationX: 90,  // Rotation X initiale en degrés (vue de dessus)
-    endRotationX: 11,   // Rotation X finale en degrés
+    endRotationX: 11,    // Rotation X finale en degrés pour le premier mouvement
     startDistance: 13,   // Distance initiale
     endDistance: 4.45,   // Distance finale
+    
+    // NOUVEAU: Configuration pour les étapes de l'animation
+    splitStart: 0, // Début de l'animation de division (sera mis à jour dans updateCameraFromScroll)
+    splitEnd: 1,   // Fin de l'animation de division (sera mis à jour dans updateCameraFromScroll)
 };
 
 console.log("Configuration de l'animation au scroll:", scrollConfig);
@@ -50,44 +63,51 @@ console.log("Configuration de l'animation au scroll:", scrollConfig);
 function updateCameraFromScroll() {
     // Obtenir les sections
     const sections = document.querySelectorAll('.airdrop_content');
-    if (sections.length < 2) return;
+    if (sections.length < 3) return;
     
     const secondSection = sections[1];
+    const thirdSection = sections[2];
     const secondSectionRect = secondSection.getBoundingClientRect();
+    const thirdSectionRect = thirdSection.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
-    // Calculer la progression du scroll:
-    // - 0 quand la deuxième section est en bas du viewport
-    // - 1 quand la deuxième section est en haut du viewport
-    let scrollProgress = 1 - (secondSectionRect.top / viewportHeight);
+    // Calculer la progression du scroll pour la rotation de la caméra
+    let rotationProgress = 1 - (secondSectionRect.top / viewportHeight);
+    rotationProgress = Math.max(0, Math.min(1, rotationProgress));
     
-    // Limiter entre 0 et 1
-    scrollProgress = Math.max(0, Math.min(1, scrollProgress));
-    
-    // Log de la progression (tous les 60 frames)
-    if (frameCount % 60 === 0) {
-        console.log(`Second section: top=${secondSectionRect.top}, viewport height=${viewportHeight}`);
-        console.log(`Scroll progress: ${scrollProgress.toFixed(2)}`);
+    // Calculer la progression du scroll pour la division des cercles
+    let splitProgress = 0;
+    if (thirdSectionRect.top <= viewportHeight) {
+        splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
+        splitProgress = Math.max(0, Math.min(1, splitProgress));
+        
+        // Activer l'animation de division
+        config.splitAnimation.active = true;
     }
     
-    // Calcul de l'angle de rotation actuel (interpolation linéaire)
-    const currentRotationX = scrollConfig.startRotationX + 
-                           (scrollConfig.endRotationX - scrollConfig.startRotationX) * scrollProgress;
+    // Calculer la rotation X actuelle
+    let currentRotationX;
+    if (splitProgress > 0) {
+        // Deuxième mouvement : retour à 90°
+        currentRotationX = scrollConfig.endRotationX + (90 - scrollConfig.endRotationX) * splitProgress;
+    } else {
+        // Premier mouvement : de 90° à 11°
+        currentRotationX = scrollConfig.startRotationX + 
+                          (scrollConfig.endRotationX - scrollConfig.startRotationX) * rotationProgress;
+    }
     
     // Calcul de la distance actuelle (interpolation linéaire)
     const currentDistance = scrollConfig.startDistance + 
-                          (scrollConfig.endDistance - scrollConfig.startDistance) * scrollProgress;
+                          (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
     
     // Convertir les degrés en radians
     const angleInRadians = THREE.MathUtils.degToRad(currentRotationX);
     
-    // Calculer la position du troisième cercle (index 2)
-    const targetY = -2 * config.additionalCircleVerticalSpacing;
+    // Calculer la position du troisième cercle (index 1)
+    const targetY = -1 * config.additionalCircleVerticalSpacing;
     
     // Positionner la caméra en fonction de la rotation X
-    // La position est relative au troisième cercle qui est notre nouveau centre
     if (currentRotationX === 90) {
-        // Position exacte à 90 degrés (vue de dessus)
         camera.position.set(0, currentDistance + targetY, 0);
     } else {
         const y = currentDistance * Math.sin(angleInRadians) + targetY;
@@ -98,16 +118,66 @@ function updateCameraFromScroll() {
     // Regarder vers le centre du troisième cercle
     camera.lookAt(0, targetY, 0);
     
+    // Mettre à jour l'animation de division avec le nouveau splitProgress
+    if (config.splitAnimation.active && splitProgress > 0) {
+        updateSplitAnimation(splitProgress);
+    }
+    
     // Mise à jour de l'information de caméra dans l'interface
     updateCameraInfo();
+}
+
+// Fonction pour mettre à jour l'animation de division
+function updateSplitAnimation(progress) {
+    const gridSize = config.splitAnimation.gridSize;
+    const spacing = config.splitAnimation.spacing;
+    const spread = config.splitAnimation.particleSpread;
     
-    // Log pour débogage (tous les 60 frames)
-    if (frameCount % 60 === 0) {
-        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'XYZ');
-        console.log(`Rotation - X: ${THREE.MathUtils.radToDeg(euler.x).toFixed(2)}°, Y: ${THREE.MathUtils.radToDeg(euler.y).toFixed(2)}°, Z: ${THREE.MathUtils.radToDeg(euler.z).toFixed(2)}°`);
-        console.log(`Angle cible X: ${currentRotationX.toFixed(2)}°`);
-        console.log(`Position: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`);
+    // Calculer les positions cibles pour chaque cercle
+    const targetPositions = [];
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const x = (j - (gridSize - 1) / 2) * spacing;
+            const z = (i - (gridSize - 1) / 2) * spacing;
+            targetPositions.push({ x, z });
+        }
     }
+    
+    // Cibler uniquement les particules du troisième cercle (index 1)
+    const targetY = -1 * config.additionalCircleVerticalSpacing;
+    const centralParticles = particles.filter(p => 
+        p.isAdditionalCircle && 
+        p.additionalCircleIndex === 1
+    );
+    
+    centralParticles.forEach((particle, index) => {
+        // Déterminer à quel sous-cercle cette particule appartient
+        const gridIndex = Math.floor(index * gridSize * gridSize / centralParticles.length);
+        const target = targetPositions[gridIndex % (gridSize * gridSize)];
+        
+        // Calculer la position sur le cercle pour cette particule dans son sous-cercle
+        const particleAngle = (index * Math.PI * 2) / (centralParticles.length / (gridSize * gridSize));
+        const subCircleRadius = 0.3; // Rayon des petits cercles
+        
+        // Calculer un offset circulaire pour former des cercles distincts
+        const offsetX = Math.cos(particleAngle) * subCircleRadius;
+        const offsetZ = Math.sin(particleAngle) * subCircleRadius;
+        
+        // Interpolation entre la position d'origine et la position cible
+        const originalX = particle.originalX || (particle.originalX = particle.x);
+        const originalY = particle.originalY || (particle.originalY = particle.y);
+        const originalZ = particle.originalZ || (particle.originalZ = particle.z);
+        
+        // Appliquer une courbe d'accélération pour une animation plus naturelle
+        const easeProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : -1 + (4 - 2 * progress) * progress;
+        
+        // Calculer la nouvelle position avec l'offset circulaire
+        particle.x = originalX * (1 - easeProgress) + (target.x + offsetX) * easeProgress;
+        particle.z = originalZ * (1 - easeProgress) + (target.z + offsetZ) * easeProgress;
+        particle.y = originalY; // Maintenir la position Y constante
+    });
 }
 
 // Initialisation de la scène, caméra et renderer
@@ -150,7 +220,7 @@ class Particle {
             // Position aléatoire dans le cercle 
             const angle = Math.random() * Math.PI * 2;
             // Distribution dans tout le cercle (pas seulement sur le contour)
-            const radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill; // Racine carrée pour distribution uniforme
+            const radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill;
             this.radius = config.innerRadius * radiusFactor;
             
             this.isStatic = true;
@@ -166,6 +236,11 @@ class Particle {
             } else if (this.isAdditionalCircle) {
                 // Position avec décalage vertical selon l'index du cercle supplémentaire
                 this.y = -(this.additionalCircleIndex + 1) * config.additionalCircleVerticalSpacing;
+                
+                // Log pour le cercle central (index 2)
+                if (this.additionalCircleIndex === 2) {
+                    console.log(`Initializing central circle particle at Y: ${this.y}`);
+                }
             }
             
             // Pas de direction pour les particules statiques
@@ -185,9 +260,14 @@ class Particle {
             // Ajouter une légère pulsation (fréquence différente pour chaque cercle)
             this.pulseSpeed = 0.01 + Math.random() * 0.02;
             if (this.isAdditionalCircle) {
-                this.pulseSpeed += this.additionalCircleIndex * 0.002; // Variation subtile entre les cercles
+                this.pulseSpeed += this.additionalCircleIndex * 0.002;
             }
             this.pulsePhase = Math.random() * Math.PI * 2;
+            
+            // Réinitialiser les positions d'origine
+            this.originalX = this.x;
+            this.originalY = this.y;
+            this.originalZ = this.z;
         } else {
             // Réinitialiser en tant que particule du cercle extérieur
             this.resetOuterParticle();
@@ -399,6 +479,7 @@ function createParticles() {
         const particle = new Particle(index++);
         particle.isInnerCircle = true;
         particle.isAdditionalCircle = false;
+        particle.additionalCircleIndex = -1;
         particle.isStatic = true;
         particle.resetParticle();
         particles.push(particle);
@@ -406,6 +487,7 @@ function createParticles() {
     
     // Créer les particules pour les cercles supplémentaires
     for (let circleIndex = 0; circleIndex < config.additionalCircles; circleIndex++) {
+        console.log(`Creating particles for additional circle ${circleIndex}`);
         for (let i = 0; i < config.additionalCircleParticles; i++) {
             const particle = new Particle(index++);
             particle.isInnerCircle = false;
@@ -413,6 +495,14 @@ function createParticles() {
             particle.additionalCircleIndex = circleIndex;
             particle.isStatic = true;
             particle.resetParticle();
+            
+            // Log pour le cercle central (index 2)
+            if (circleIndex === 2) {
+                if (i === 0) {
+                    console.log(`Creating central circle particles at Y: ${particle.y}`);
+                }
+            }
+            
             particles.push(particle);
         }
     }
@@ -420,14 +510,14 @@ function createParticles() {
     // Créer les particules pour le cercle extérieur
     let staticCount = 0;
     let mobileCount = 0;
-    const targetMobileRatio = 0.4; // Augmenter le ratio cible de particules mobiles
+    const targetMobileRatio = 0.4;
     
     for (let i = 0; i < config.outerCircleParticles; i++) {
         const particle = new Particle(index++);
         particle.isInnerCircle = false;
         particle.isAdditionalCircle = false;
+        particle.additionalCircleIndex = -1;
         
-        // S'assurer que nous avons suffisamment de particules mobiles
         const currentMobileRatio = mobileCount / (staticCount + mobileCount + 1);
         if (currentMobileRatio < targetMobileRatio) {
             particle.isStatic = false;
@@ -442,7 +532,16 @@ function createParticles() {
         particles.push(particle);
     }
     
-    console.log(`Particules créées: ${particles.length} total, avec ${mobileCount} mobiles (${((mobileCount / config.outerCircleParticles) * 100).toFixed(1)}%)`);
+    // Log du nombre de particules par type
+    const centralCircleParticles = particles.filter(p => 
+        p.isAdditionalCircle && p.additionalCircleIndex === 2
+    ).length;
+    
+    console.log(`Statistiques des particules:
+    - Total: ${particles.length}
+    - Cercle central (index 2): ${centralCircleParticles}
+    - Position Y du cercle central: ${-2 * config.additionalCircleVerticalSpacing}`);
+    
     return particles;
 }
 
@@ -701,16 +800,8 @@ function init() {
         guideCircles = createGuideCircles();
         scene.add(guideCircles);
         
-        // Axes masqués - commenté pour les cacher
-        // const axesHelper = new THREE.AxesHelper(2);
-        // axesHelper.position.set(0, targetY, 0); // Positionner les axes sur le troisième cercle
-        // scene.add(axesHelper);
-        
-        // Désactiver les contrôles d'orbite pour empêcher toute interférence
+        // Désactiver les contrôles d'orbite
         controls.enabled = false;
-        
-        // Mettre à jour l'affichage de la caméra
-        updateCameraInfo();
         
         // Initialiser l'animation
         animate();
@@ -718,6 +809,29 @@ function init() {
         console.error("Canvas container not found");
     }
 }
+
+// Initialiser les contrôles UI après le chargement du DOM
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM chargé, initialisation...");
+    
+    // Mettre à jour la taille lors du chargement
+    updateRendererSize();
+    
+    // Initialiser la scène
+    init();
+    
+    // Ajouter un écouteur d'événement pour le défilement
+    window.addEventListener('scroll', () => {
+        // Marquer que l'utilisateur a commencé à défiler
+        hasScrolled = true;
+        // Mettre à jour la position de la caméra en fonction du défilement
+        requestAnimationFrame(updateCameraFromScroll);
+    });
+    
+    // Initialiser les contrôles
+    setupControls();
+    setupCameraInfoToggle();
+});
 
 // Gestion des contrôles UI
 function setupControls() {
@@ -747,29 +861,24 @@ function setupControls() {
             
             // Pour le nombre de particules, recréer les particules
             if (['innerCircleParticles', 'outerCircleParticles'].includes(property)) {
-                // Si nous modifions le nombre de particules du cercle intérieur, mettre à jour aussi
-                // le nombre de particules pour les cercles supplémentaires
                 if (property === 'innerCircleParticles') {
                     config.additionalCircleParticles = value;
                 }
-                // Recréer le tableau de particules et la géométrie
                 recreateParticles();
             }
             
             // Appliquer les changements selon le paramètre
             if (['innerRadius', 'outerRadius', 'additionalCircleVerticalSpacing'].includes(property)) {
-                // Recréer les cercles guides
                 scene.remove(guideCircles);
                 guideCircles = createGuideCircles();
                 scene.add(guideCircles);
                 
-                // Réinitialiser les particules pour s'adapter aux nouveaux rayons/positions
                 for (let i = 0; i < particles.length; i++) {
                     particles[i].resetParticle();
                 }
             }
             
-            // Pour certains paramètres, réinitialiser complètement les particules
+            // Pour certains paramètres, réinitialiser les particules
             if (['staticRingWidth', 'outerOutwardRatio', 'innerCircleFill'].includes(property)) {
                 for (let i = 0; i < particles.length; i++) {
                     particles[i].resetParticle();
@@ -778,7 +887,6 @@ function setupControls() {
             
             // Pour la perspective, recréer le matériau
             if (property === 'perspectiveEffect') {
-                // Recréer le matériau avec la nouvelle valeur d'effet de perspective
                 scene.remove(particlesObject);
                 particlesMaterial = createParticlesMaterial();
                 particlesObject = new THREE.Points(geometry, particlesMaterial);
@@ -794,39 +902,17 @@ function setupControls() {
         });
     };
 
-    // Fonction pour recréer complètement le système de particules
+    // Fonction pour recréer le système de particules
     function recreateParticles() {
         console.log("Recréation des particules...");
         
-        // Recréer toutes les particules en utilisant notre fonction
         particles = createParticles();
         
-        // Recréer la géométrie pour les nouvelles particules
         scene.remove(particlesObject);
         ({ geometry, positions, sizes, colors, baseColor } = createParticlesGeometry());
         particlesMaterial = createParticlesMaterial();
         particlesObject = new THREE.Points(geometry, particlesMaterial);
         scene.add(particlesObject);
-        
-        // Compter et afficher les statistiques
-        let mobileCount = 0;
-        let staticCount = 0;
-        let innerCount = 0;
-        let additionalCount = 0;
-        
-        for (let i = 0; i < particles.length; i++) {
-            if (particles[i].isInnerCircle) innerCount++;
-            else if (particles[i].isAdditionalCircle) additionalCount++;
-            else if (particles[i].isStatic) staticCount++;
-            else mobileCount++;
-        }
-        
-        console.log(`Statistiques après recréation:
-        - Particules cercle intérieur: ${innerCount}
-        - Particules cercles additionnels: ${additionalCount}
-        - Particules extérieures statiques: ${staticCount}
-        - Particules extérieures mobiles: ${mobileCount}
-        - Total: ${particles.length}`);
     }
 
     // Gestion du bouton pour masquer/afficher les contrôles
@@ -841,8 +927,6 @@ function setupControls() {
             }
             controlsVisible = !controlsVisible;
         });
-    } else {
-        console.error("Bouton de masquage/affichage non trouvé");
     }
     
     // Configuration des contrôles spécifiques
@@ -862,59 +946,6 @@ function setupControls() {
     setupControl('additionalCircleVerticalSpacing', 'additionalCircleVerticalSpacing', 0.2, 1.5, 0.1);
 }
 
-// Initialiser les contrôles UI après le chargement du DOM
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM chargé, initialisation...");
-    
-    // Mettre à jour la taille lors du chargement
-    updateRendererSize();
-    
-    // Initialiser la scène
-    init();
-    
-    // Ajouter un écouteur d'événement pour le défilement
-    window.addEventListener('scroll', () => {
-        // Marquer que l'utilisateur a commencé à défiler
-        hasScrolled = true;
-        // Mettre à jour la position de la caméra en fonction du défilement
-        requestAnimationFrame(updateCameraFromScroll);
-    });
-    console.log("Écouteur d'événement de défilement ajouté");
-    
-    // Initialiser les contrôles
-    setupControls();
-    setupCameraInfoToggle();
-    
-    // Vérifier le nombre initial de particules mobiles
-    let initialMovingCount = 0;
-    for (let i = 0; i < particles.length; i++) {
-        if (!particles[i].isStatic) initialMovingCount++;
-    }
-    
-    // S'assurer qu'il y a suffisamment de particules mobiles au départ
-    const minMobileParticles = Math.floor(config.outerCircleParticles * config.minMobileRatio);
-    if (initialMovingCount < minMobileParticles) {
-        console.log(`Nombre initial de particules mobiles (${initialMovingCount}) inférieur au minimum requis (${minMobileParticles}), ajustement...`);
-        
-        // Calcul de l'index de début des particules du cercle extérieur
-        const outerCircleStartIndex = config.innerCircleParticles + (config.additionalCircles * config.additionalCircleParticles);
-        
-        // Convertir certaines particules statiques en particules mobiles
-        let adjustedCount = 0;
-        for (let i = outerCircleStartIndex; i < particles.length && initialMovingCount < minMobileParticles; i++) {
-            if (particles[i].isStatic) {
-                particles[i].isStatic = false;
-                particles[i].direction = -1; // Vers l'intérieur par défaut
-                particles[i].speed = config.particleSpeed * (0.7 + Math.random() * 0.6);
-                adjustedCount++;
-                initialMovingCount++;
-            }
-        }
-        
-        console.log(`${adjustedCount} particules converties en particules mobiles au démarrage.`);
-    }
-});
-
 // Gestion du bouton pour afficher/masquer les indicateurs de caméra
 function setupCameraInfoToggle() {
     const cameraInfoPanel = document.getElementById('camera-info');
@@ -924,7 +955,6 @@ function setupCameraInfoToggle() {
     if (toggleButton && cameraInfoPanel) {
         toggleButton.addEventListener('click', () => {
             if (infoVisible) {
-                // Masquer les statistiques - sauf le bouton
                 const children = cameraInfoPanel.children;
                 for (let i = 0; i < children.length; i++) {
                     if (children[i] !== toggleButton) {
@@ -934,7 +964,6 @@ function setupCameraInfoToggle() {
                 cameraInfoPanel.style.padding = '5px';
                 toggleButton.textContent = 'Afficher';
             } else {
-                // Réafficher les statistiques
                 const children = cameraInfoPanel.children;
                 for (let i = 0; i < children.length; i++) {
                     children[i].style.display = '';
@@ -945,4 +974,4 @@ function setupCameraInfoToggle() {
             infoVisible = !infoVisible;
         });
     }
-} 
+}

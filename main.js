@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+
 // Configuration
 const config = {
     // Paramètres des cercles
@@ -12,7 +13,8 @@ const config = {
     outerCircleParticles: 1700, // Nombre de particules dans le cercle extérieur
     baseParticleSize: 0.6,    // Taille de base des particules
     additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
-    particleColor: 0x00ffcc,  // Couleur des particules (vert)
+    particleColor: 0xffffff,  // Couleur des particules (blanc)
+    splitCircleColor: 0x00ffcc, // Couleur du cercle qui se scinde et des 9 cercles résultants (vert)
     
     // Paramètres d'animation
     maxParticleDistance: 3,   // Distance maximale que peuvent parcourir les particules depuis leur cercle
@@ -781,6 +783,10 @@ function animate() {
     let movingCount = 0;
     let centralCircleCount = 0; // Compteur pour le cercle central (index 1)
     
+    // Créer des couleurs THREE.js à partir des valeurs hexadécimales
+    const mainColor = new THREE.Color(config.particleColor);
+    const splitColor = new THREE.Color(config.splitCircleColor);
+    
     // Mise à jour des particules
     for (let i = 0; i < particles.length; i++) {
         const particle = particles[i];
@@ -839,10 +845,18 @@ function animate() {
             // Mettre à jour la taille
             sizes[i] = particle.currentSize;
             
-            // Mettre à jour la couleur
-            colors[idx] = baseColor.r;
-            colors[idx + 1] = baseColor.g;
-            colors[idx + 2] = baseColor.b;
+            // Mettre à jour la couleur - utiliser la couleur verte pour le cercle qui se scinde
+            if ((particle.isAdditionalCircle && particle.additionalCircleIndex === 1) || particle.hasBeenSplit) {
+                // Appliquer la couleur verte au cercle qui se scinde et aux particules divisées
+                colors[idx] = splitColor.r;
+                colors[idx + 1] = splitColor.g;
+                colors[idx + 2] = splitColor.b;
+            } else {
+                // Utiliser la couleur principale pour les autres particules
+                colors[idx] = mainColor.r;
+                colors[idx + 1] = mainColor.g;
+                colors[idx + 2] = mainColor.b;
+            }
             
             // Mettre à jour l'opacité
             opacities[i] = particle.opacity !== undefined ? particle.opacity : 1.0;

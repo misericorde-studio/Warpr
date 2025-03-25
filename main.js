@@ -11,7 +11,8 @@ const config = {
     innerCircleParticles: 100, // Nombre de particules dans le cercle intérieur
     outerCircleParticles: 1700, // Nombre de particules dans le cercle extérieur
     baseParticleSize: 0.6,    // Taille de base des particules
-    particleColor: 0x00ffcc,  // Couleur des particules
+    additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
+    particleColor: 0x00ffcc,  // Couleur des particules (vert)
     
     // Paramètres d'animation
     maxParticleDistance: 3,   // Distance maximale que peuvent parcourir les particules depuis leur cercle
@@ -20,16 +21,16 @@ const config = {
     
     // Paramètres visuels
     perspectiveEffect: 0.4,   // Effet de perspective (0-1)
-    staticRingWidth: 1,     // Largeur de l'anneau statique du cercle extérieur (0-1) de l'épaisseur totale
+    staticRingWidth: 0.2,     // Largeur de l'anneau statique du cercle extérieur - FORTEMENT RÉDUIT pour minimiser les cercles visibles
     outerOutwardRatio: 0.6,   // Proportion de particules se déplaçant vers l'extérieur (cercle extérieur)
-    innerCircleFill: 0.9,     // Proportion du rayon intérieur à remplir (0 = juste le contour, 1 = tout le cercle)
+    innerCircleFill: 0.8,     // Proportion du rayon intérieur à remplir - RÉDUIT pour disperser les particules
     
     // NOUVEAU: Paramètres de gestion du flux de particules
-    minMobileRatio: 0.3,      // Ratio minimum de particules mobiles par rapport aux particules du cercle extérieur
+    minMobileRatio: 0.7,      // Ratio minimum de particules mobiles - FORTEMENT AUGMENTÉ pour disperser davantage les particules
     
     // NOUVEAU: Paramètres pour les cercles supplémentaires
     additionalCircles: 4,      // Nombre de cercles supplémentaires
-    additionalCircleParticles: 450, // Nombre de particules par cercle supplémentaire (augmenté pour avoir plus de particules dans les cercles de fin)
+    additionalCircleParticles: 450, // Nombre de particules par cercle supplémentaire
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
     
     // Configuration pour l'animation de division
@@ -40,8 +41,9 @@ const config = {
         circleFill: 0.9, // Remplissage des petits cercles (0-1)
         transitionDuration: 1.0, // Durée de la transition
         active: false, // État de l'animation
-        particleScale: 0.5, // Facteur d'échelle pour les particules des cercles de fin
-        currentSizeMultiplier: 1.0 // Variable pour contrôler la taille actuelle des particules en fonction du scroll
+        particleScale: 0.3, // Facteur d'échelle plus petit pour les particules des cercles de fin (était 0.5)
+        currentSizeMultiplier: 1.0, // Variable pour contrôler la taille actuelle des particules en fonction du scroll
+        otherCirclesOpacity: 1.0 // Opacité des autres cercles verticaux (contrôlée par le scroll)
     }
 };
 
@@ -101,9 +103,13 @@ function updateCameraFromScroll() {
         // Faire une transition douce entre 1.0 et config.splitAnimation.particleScale
         config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
         
+        // Réduire progressivement l'opacité des autres cercles verticaux
+        // L'opacité passe de 1.0 à 0.0 en synchronisation avec le scroll
+        config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
+        
         // Log de débogage
         if (frameCount % 120 === 0) {
-            console.log(`Progrès de l'animation: ${splitProgress.toFixed(2)}, multiplicateur de taille: ${config.splitAnimation.currentSizeMultiplier.toFixed(2)}`);
+            console.log(`Progrès de l'animation: ${splitProgress.toFixed(2)}, multiplicateur de taille: ${config.splitAnimation.currentSizeMultiplier.toFixed(2)}, opacité autres cercles: ${config.splitAnimation.otherCirclesOpacity.toFixed(2)}`);
         }
     } else {
         // Si on scrolle vers le haut et qu'on quitte la section 3
@@ -111,6 +117,9 @@ function updateCameraFromScroll() {
         
         // Restaurer le multiplicateur de taille à 1.0
         config.splitAnimation.currentSizeMultiplier = 1.0;
+        
+        // Restaurer l'opacité des autres cercles verticaux à 1.0
+        config.splitAnimation.otherCirclesOpacity = 1.0;
         
         if (frameCount % 120 === 0) {
             console.log(`Section 3 non visible, scroll vers ${isScrollingUp ? 'le haut' : 'le bas'}`);
@@ -329,6 +338,9 @@ class Particle {
         this.sizeTransitionProgress = 0;
         this.inSizeTransition = false;
         
+        // Propriété d'opacité pour les cercles verticaux
+        this.opacity = 1.0;
+
         this.active = true;
     }
     
@@ -352,18 +364,22 @@ class Particle {
             // Position verticale (spécifique à chaque cercle)
             if (this.isInnerCircle) {
                 this.y = 0; // Le cercle principal est à y=0
+                
+                // Taille normale pour le cercle principal
+                this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
+                this.currentSize = this.size;
             } else if (this.isAdditionalCircle) {
                 // Position avec décalage vertical selon l'index du cercle supplémentaire
                 this.y = -(this.additionalCircleIndex + 1) * config.additionalCircleVerticalSpacing;
+                
+                // Taille réduite pour les cercles verticaux
+                this.size = config.baseParticleSize * config.additionalCircleParticleScale * (0.7 + Math.random() * 0.6);
+                this.currentSize = this.size;
             }
             
             // Pas de direction pour les particules statiques
             this.direction = 0;
             this.distanceTraveled = 0;
-            
-            // Taille de base fixe
-            this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
-            this.currentSize = this.size;
             
             // Réinitialiser les positions d'origine
             this.originalX = this.x;
@@ -502,6 +518,7 @@ function createParticlesGeometry() {
     const positions = new Float32Array(totalParticles * 3); // xyz pour chaque point
     const sizes = new Float32Array(totalParticles);
     const colors = new Float32Array(totalParticles * 3); // rgb pour chaque point
+    const opacities = new Float32Array(totalParticles); // opacité pour chaque point
     
     // Initialiser avec des valeurs par défaut
     for (let i = 0; i < totalParticles; i++) {
@@ -517,6 +534,8 @@ function createParticlesGeometry() {
         colors[idx] = color.r;
         colors[idx + 1] = color.g;
         colors[idx + 2] = color.b;
+        // Opacité par défaut
+        opacities[i] = 1.0;
     }
     
     const baseColor = {
@@ -529,8 +548,9 @@ function createParticlesGeometry() {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
     
-    return { geometry, positions, sizes, colors, baseColor };
+    return { geometry, positions, sizes, colors, opacities, baseColor };
 }
 
 // Créer le matériau pour les particules
@@ -542,11 +562,14 @@ function createParticlesMaterial() {
         vertexShader: `
             attribute float size;
             attribute vec3 color;
+            attribute float opacity;
             varying vec3 vColor;
+            varying float vOpacity;
             uniform vec3 cameraPos;
             
             void main() {
                 vColor = color;
+                vOpacity = opacity;
                 
                 // Calcul de distance à la caméra
                 float distanceToCamera = distance(position, cameraPos);
@@ -563,17 +586,29 @@ function createParticlesMaterial() {
         `,
         fragmentShader: `
             varying vec3 vColor;
+            varying float vOpacity;
             
             void main() {
                 // Calcul de la distance au centre du point
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 
-                // Création d'un point circulaire avec un dégradé doux
-                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                // Réduire encore plus la taille du cercle visible
+                float threshold = 0.25; // Valeur encore plus petite pour réduire davantage la taille des cercles
                 
-                // Couleur finale avec transparence
-                gl_FragColor = vec4(vColor, alpha);
+                // Création d'un point lumineux plus petit avec une transition plus nette
+                float alpha = 1.0 - smoothstep(threshold, threshold + 0.03, dist);
+                
+                // Assombrir légèrement les bords pour atténuer l'effet de cercle vert
+                if (dist > threshold) {
+                    alpha *= 0.4; // Réduire l'opacité dans la zone de transition
+                }
+                
+                // Couleur finale avec opacité contrôlée
+                gl_FragColor = vec4(vColor, alpha * vOpacity);
+                
+                // Rejeter les fragments au-delà du seuil pour une coupure nette
+                if (dist > threshold + 0.03) discard;
             }
         `,
         transparent: true,
@@ -651,62 +686,15 @@ function createParticles() {
 
 // Créer la géométrie et le matériau pour les particules
 let particles = createParticles();
-let { geometry, positions, sizes, colors, baseColor } = createParticlesGeometry();
+let { geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry();
 let particlesMaterial = createParticlesMaterial();
 let particlesObject = new THREE.Points(geometry, particlesMaterial);
 scene.add(particlesObject);
 
-// Ajouter des cercles guides (pour visualiser les orbites)
+// Version alternative sans créer de cercles guides
 function createGuideCircles() {
-    const guideGroup = new THREE.Group();
-    
-    // Cercle intérieur principal
-    const innerCircleGeometry = new THREE.RingGeometry(config.innerRadius - 0.02, config.innerRadius + 0.02, 64);
-    const innerCircleMaterial = new THREE.MeshBasicMaterial({ 
-        color: config.particleColor, 
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.3
-    });
-    const innerCircle = new THREE.Mesh(innerCircleGeometry, innerCircleMaterial);
-    innerCircle.rotation.x = Math.PI / 2; // Orienter horizontalement
-    guideGroup.add(innerCircle);
-    
-    // Cercles supplémentaires
-    for (let i = 0; i < config.additionalCircles; i++) {
-        const additionalCircleGeometry = new THREE.RingGeometry(
-            config.innerRadius - 0.02, 
-            config.innerRadius + 0.02, 
-            64
-        );
-        const additionalCircleMaterial = new THREE.MeshBasicMaterial({ 
-            color: config.particleColor, 
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.3
-        });
-        const additionalCircle = new THREE.Mesh(additionalCircleGeometry, additionalCircleMaterial);
-        additionalCircle.rotation.x = Math.PI / 2; // Orienter horizontalement
-        
-        // Positionner verticalement
-        additionalCircle.position.y = -(i + 1) * config.additionalCircleVerticalSpacing;
-        
-        guideGroup.add(additionalCircle);
-    }
-    
-    // Cercle extérieur
-    const outerCircleGeometry = new THREE.RingGeometry(config.outerRadius - 0.02, config.outerRadius + 0.02, 64);
-    const outerCircleMaterial = new THREE.MeshBasicMaterial({ 
-        color: config.particleColor, 
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.3
-    });
-    const outerCircle = new THREE.Mesh(outerCircleGeometry, outerCircleMaterial);
-    outerCircle.rotation.x = Math.PI / 2; // Orienter horizontalement
-    guideGroup.add(outerCircle);
-    
-    return guideGroup;
+    // Créer un groupe vide (aucun cercle guide n'est créé)
+    return new THREE.Group();
 }
 
 let guideCircles = createGuideCircles();
@@ -807,6 +795,27 @@ function animate() {
             particle.currentSize = particle.size * config.splitAnimation.currentSizeMultiplier;
         }
         
+        // Gérer l'opacité des cercles verticaux et du cercle principal (en haut)
+        if (particle.isAdditionalCircle || particle.isInnerCircle) {
+            // Le cercle qui se scinde (index 1) reste toujours visible
+            if (particle.isAdditionalCircle && particle.additionalCircleIndex === 1) {
+                particle.active = true;
+                particle.opacity = 1.0; // Toujours complètement visible
+            } 
+            // Tous les autres cercles (y compris le cercle principal et les autres verticaux) deviennent progressivement transparents
+            else {
+                // Si l'opacité est presque nulle, désactiver complètement la particule
+                if (config.splitAnimation.otherCirclesOpacity < 0.05) {
+                    particle.active = false;
+                } else {
+                    particle.active = true;
+                    
+                    // Appliquer l'opacité actuelle basée sur le scroll
+                    particle.opacity = config.splitAnimation.otherCirclesOpacity;
+                }
+            }
+        }
+        
         // Ne mettre à jour que les particules non statiques et actives
         if (!particle.isStatic && particle.active) {
             particle.update(0.016); // Environ 60 FPS
@@ -834,6 +843,9 @@ function animate() {
             colors[idx] = baseColor.r;
             colors[idx + 1] = baseColor.g;
             colors[idx + 2] = baseColor.b;
+            
+            // Mettre à jour l'opacité
+            opacities[i] = particle.opacity !== undefined ? particle.opacity : 1.0;
         } else {
             // Pour les particules inactives, les déplacer hors de la vue
             const idx = i * 3;
@@ -841,6 +853,7 @@ function animate() {
             positions[idx + 1] = -1000; // Très loin en dessous
             positions[idx + 2] = 0;
             sizes[i] = 0; // Taille nulle
+            opacities[i] = 0; // Opacité nulle
         }
     }
     
@@ -887,6 +900,7 @@ function animate() {
     geometry.attributes.position.needsUpdate = true;
     geometry.attributes.size.needsUpdate = true;
     geometry.attributes.color.needsUpdate = true;
+    geometry.attributes.opacity.needsUpdate = true;
     
     // Mise à jour des indicateurs de caméra
     updateCameraInfo();
@@ -993,10 +1007,7 @@ function setupControls() {
             
             // Appliquer les changements selon le paramètre
             if (['innerRadius', 'outerRadius', 'additionalCircleVerticalSpacing'].includes(property)) {
-                scene.remove(guideCircles);
-                guideCircles = createGuideCircles();
-                scene.add(guideCircles);
-                
+                // Réinitialiser uniquement les particules, les cercles guides n'existent plus
                 for (let i = 0; i < particles.length; i++) {
                     particles[i].resetParticle();
                 }
@@ -1033,7 +1044,7 @@ function setupControls() {
         particles = createParticles();
         
         scene.remove(particlesObject);
-        ({ geometry, positions, sizes, colors, baseColor } = createParticlesGeometry());
+        ({ geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry());
         particlesMaterial = createParticlesMaterial();
         particlesObject = new THREE.Points(geometry, particlesMaterial);
         scene.add(particlesObject);

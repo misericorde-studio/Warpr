@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cercles de Particules Dynamiques - Three.js</title>
+    <title>Warpr</title>
     <style>
         @font-face {
             font-family: 'MonumentGroteskMono-Light';
@@ -65,6 +65,45 @@
             left: 1.5rem;
             z-index: 100;
         }
+
+        .crosses-wrapper{
+            position: absolute;
+            z-index: 110;
+            height: 100%;
+            width: 100%;
+        }
+.crosses{
+    position: absolute;
+    z-index: 100;
+    height: 100%;
+    width: 100%;
+}
+        .cross{
+            width: 10px;
+            height: 10px;
+            position: absolute;
+        }
+
+        .cross_1{
+            top: 20%;
+            left: 20%;
+        }
+
+        .cross_2{
+            top: 20%;
+            right: 20%;
+        }
+
+        .cross_3{
+            bottom: 20%;
+            left: 20%;
+        }
+
+        .cross_4{
+            bottom: 20%;
+            right: 20%;
+        }
+        
 
         .indicator-item {
             width: 5px;
@@ -138,6 +177,7 @@
             height: 90vh;
             overflow: scroll;
             z-index: 2;
+            display: none;
         }
         
         .control-group {
@@ -196,6 +236,7 @@
             color: #00ffcc;
             line-height: 1.5;
             z-index: 100;
+            display: none;
         }
         
 
@@ -205,12 +246,13 @@
     <div class="airdrop">
 
         <div class="airdrop_left">
-            <div class="crosses">
-                <div class="cross"><img src="img/cross.png" alt="cross"></div>
-                <div class="cross cross_2"><img src="img/cross.png" alt="cross"></div>
-                <div class="cross cross_3"><img src="img/cross.png" alt="cross"></div>
-                <div class="cross cross_4"><img src="img/cross.png" alt="cross"></div>
+            <div class="crosses-wrapper">
 
+                    <div class="cross cross_1"><img src="img/cross.png" alt="cross"></div>
+                    <div class="cross cross_2"><img src="img/cross.png" alt="cross"></div>
+                    <div class="cross cross_3"><img src="img/cross.png" alt="cross"></div>
+                <div class="cross cross_4"><img src="img/cross.png" alt="cross"></div>
+  
             </div>
             <div class="indicator">
                 <div class="indicator-item"></div>

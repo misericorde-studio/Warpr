@@ -701,10 +701,10 @@ function init() {
         guideCircles = createGuideCircles();
         scene.add(guideCircles);
         
-        // Ajouter l'axe pour visualisation au niveau du troisième cercle
-        const axesHelper = new THREE.AxesHelper(2);
-        axesHelper.position.set(0, targetY, 0); // Positionner les axes sur le troisième cercle
-        scene.add(axesHelper);
+        // Axes masqués - commenté pour les cacher
+        // const axesHelper = new THREE.AxesHelper(2);
+        // axesHelper.position.set(0, targetY, 0); // Positionner les axes sur le troisième cercle
+        // scene.add(axesHelper);
         
         // Désactiver les contrôles d'orbite pour empêcher toute interférence
         controls.enabled = false;

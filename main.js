@@ -42,10 +42,15 @@ const config = {
     // NOUVEAU: Paramètres pour les cercles supplémentaires
     additionalCircles: 4,      // 3 blancs + 1 vert (le cercle intérieur compte comme un blanc)
     whiteCircleParticles: 100, // Nombre de particules pour les cercles blancs
-    greenCircleParticles: 200, // Nombre de particules pour le cercle vert
-    whiteCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles blancs
-    greenCircleParticleScale: 0.8, // Facteur d'échelle pour les particules du cercle vert
+    greenCircleParticles: 100, // Nombre de particules pour le cercle vert
+    whiteCircleParticleScale: 0.8, // Facteur d'échelle pour les particules des cercles blancs
+    greenCircleParticleScale: 0.9, // Facteur d'échelle pour les particules du cercle vert
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
+    
+    // NOUVEAU: Paramètres pour les bordures des cercles additionnels
+    additionalCircleBorderRatio: 0.35, // Ratio de particules pour les bordures des cercles additionnels
+    additionalCircleBorderScale: 0.4,  // Échelle des particules de bordure pour les cercles additionnels
+    additionalCircleBorderWidth: 0.2,  // Largeur des bordures des cercles additionnels
     
     // Configuration pour l'animation de division
     splitAnimation: {
@@ -57,7 +62,9 @@ const config = {
         active: false, // État de l'animation
         particleScale: 0.3, // Facteur d'échelle plus petit pour les particules des cercles de fin (était 0.5)
         currentSizeMultiplier: 1.0, // Variable pour contrôler la taille actuelle des particules en fonction du scroll
-        otherCirclesOpacity: 1.0 // Opacité des autres cercles verticaux (contrôlée par le scroll)
+        otherCirclesOpacity: 1.0, // Opacité des autres cercles verticaux (contrôlée par le scroll)
+        borderParticleRatio: 0.35,    // Ratio de particules pour les bordures des petits cercles
+        borderParticleScale: 0.3,     // Échelle des particules de bordure pour les petits cercles
     }
 };
 
@@ -306,17 +313,17 @@ function updateCameraFromScroll() {
     if (sections[2]) {
         const thirdSection = sections[2];
         const thirdSectionRect = thirdSection.getBoundingClientRect();
-        if (thirdSectionRect.top <= viewportHeight) {
-            splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
-            splitProgress = Math.max(0, Math.min(1, splitProgress));
-            
-            config.splitAnimation.active = true;
-            config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
-            config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
-        } else {
-            config.splitAnimation.active = false;
-            config.splitAnimation.currentSizeMultiplier = 1.0;
-            config.splitAnimation.otherCirclesOpacity = 1.0;
+    if (thirdSectionRect.top <= viewportHeight) {
+        splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
+        splitProgress = Math.max(0, Math.min(1, splitProgress));
+        
+        config.splitAnimation.active = true;
+        config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
+        config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
+    } else {
+        config.splitAnimation.active = false;
+        config.splitAnimation.currentSizeMultiplier = 1.0;
+        config.splitAnimation.otherCirclesOpacity = 1.0;
         }
     }
     
@@ -348,10 +355,10 @@ function updateCameraFromScroll() {
         // Premier mouvement : de 90° à 11°
         currentRotationX = scrollConfig.startRotationX + 
                           (scrollConfig.endRotationX - scrollConfig.startRotationX) * rotationProgress;
-        
+    
         // Distance normale pendant la première étape
-        const currentDistance = scrollConfig.startDistance + 
-                              (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
+    const currentDistance = scrollConfig.startDistance + 
+                          (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
         camera.position.z = currentDistance;
     }
     
@@ -525,9 +532,23 @@ class Particle {
         if (this.isInnerCircle || this.isAdditionalCircle) {
             // Position aléatoire dans le cercle 
             const angle = Math.random() * Math.PI * 2;
-            const radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill;
-            this.radius = config.innerRadius * radiusFactor;
             
+            // Déterminer si c'est une particule de bordure
+            const isBorder = Math.random() < (this.isAdditionalCircle ? config.additionalCircleBorderRatio : config.innerBorderParticleRatio);
+            this.isBorder = isBorder;
+            
+            // Ajuster le rayon en fonction du type de particule
+            let radiusFactor;
+            if (isBorder) {
+                // Pour les particules de bordure, les placer près du bord du cercle
+                const borderWidth = this.isAdditionalCircle ? config.additionalCircleBorderWidth : config.innerBorderWidth;
+                radiusFactor = 1.0 - borderWidth + Math.random() * (borderWidth * 2); // Distribuer autour du bord
+            } else {
+                // Pour les particules normales, utiliser la distribution habituelle
+                radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill;
+            }
+            
+            this.radius = config.innerRadius * radiusFactor;
             this.isStatic = true;
             this.angle = angle;
             
@@ -537,10 +558,8 @@ class Particle {
             
             // Position verticale (spécifique à chaque cercle)
             if (this.isInnerCircle) {
-                // Décaler le cercle principal vers le haut
                 this.y = 2 * config.additionalCircleVerticalSpacing;
             } else if (this.isAdditionalCircle) {
-                // Ajuster la position des cercles verticaux par rapport au cercle vert (index 1)
                 if (this.additionalCircleIndex === 1) {
                     // Le cercle vert au centre
                     this.y = 0;
@@ -556,12 +575,12 @@ class Particle {
             
             // Taille des particules avec la nouvelle échelle
             if (this.isInnerCircle) {
-                this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
+                this.size = config.baseParticleSize * (isBorder ? config.additionalCircleBorderScale : (0.7 + Math.random() * 0.6));
             } else if (this.isAdditionalCircle) {
-                const scale = this.additionalCircleIndex === 1 ? 
+                const baseScale = this.additionalCircleIndex === 1 ? 
                     config.greenCircleParticleScale : 
                     config.whiteCircleParticleScale;
-                this.size = config.baseParticleSize * scale * (0.7 + Math.random() * 0.6);
+                this.size = config.baseParticleSize * (isBorder ? config.additionalCircleBorderScale : baseScale) * (0.7 + Math.random() * 0.6);
             }
             this.currentSize = this.size;
             
@@ -576,7 +595,7 @@ class Particle {
 
             // Initialiser le flottement pour les particules non divisées
             if (!this.hasBeenSplit) {
-                this.floatSpeed = 0.01 + Math.random() * 0.02;
+                this.floatSpeed = isBorder ? 0.02 + Math.random() * 0.03 : 0.01 + Math.random() * 0.02;
                 this.floatPhase = Math.random() * Math.PI * 2;
             }
         } else {
@@ -624,12 +643,12 @@ class Particle {
         
         this.distanceTraveled = 0;
         this.active = true;
-        this.currentSize = this.size;
-        
-        if (!this.hasBeenSplit) {
-            this.floatSpeed = 0.01 + Math.random() * 0.02;
-            this.floatPhase = Math.random() * Math.PI * 2;
-        }
+            this.currentSize = this.size;
+
+            if (!this.hasBeenSplit) {
+                this.floatSpeed = 0.01 + Math.random() * 0.02;
+                this.floatPhase = Math.random() * Math.PI * 2;
+            }
     }
     
     update(deltaTime) {
@@ -999,7 +1018,7 @@ function animate() {
             particle.update(0.016);
         }
         
-        const idx = i * 3;
+            const idx = i * 3;
         innerGeometry.attributes.position.array[idx] = particle.x;
         innerGeometry.attributes.position.array[idx + 1] = particle.y;
         innerGeometry.attributes.position.array[idx + 2] = particle.z;
@@ -1143,7 +1162,15 @@ function setupControls() {
                 'outerOutwardRatio',
                 'innerCircleFill',
                 'outerCircleParticleSize',
-                'baseParticleSize'
+                'baseParticleSize',
+                // Ajout des propriétés de bordure
+                'additionalCircleBorderRatio',
+                'additionalCircleBorderScale',
+                'additionalCircleBorderWidth',
+                'innerBorderParticleRatio',
+                'outerBorderParticleRatio',
+                'innerBorderWidth',
+                'outerBorderWidth'
             ];
             
             console.log(`Modification de ${property} à ${value}`);
@@ -1288,11 +1315,16 @@ function setupControls() {
     setupControl('minMobileRatio', 'minMobileRatio', 0.1, 0.7, 0.05);
     setupControl('additionalCircleVerticalSpacing', 'additionalCircleVerticalSpacing', 0.2, 1.5, 0.1);
     
-    // Nouveaux contrôles pour les cercles additionnels
+    // Contrôles pour les cercles additionnels
     setupControl('whiteCircleParticles', 'whiteCircleParticles', 100, 1000, 50);
     setupControl('greenCircleParticles', 'greenCircleParticles', 100, 1000, 50);
     setupControl('whiteCircleParticleScale', 'whiteCircleParticleScale', 0.1, 2.0, 0.1);
     setupControl('greenCircleParticleScale', 'greenCircleParticleScale', 0.1, 2.0, 0.1);
+    
+    // Nouveaux contrôles pour les bordures des cercles additionnels
+    setupControl('additionalCircleBorderRatio', 'additionalCircleBorderRatio', 0.1, 0.5, 0.05);
+    setupControl('additionalCircleBorderScale', 'additionalCircleBorderScale', 0.1, 1.0, 0.05);
+    setupControl('additionalCircleBorderWidth', 'additionalCircleBorderWidth', 0.1, 0.5, 0.05);
 }
 
 // Gestion du bouton pour afficher/masquer les indicateurs de caméra

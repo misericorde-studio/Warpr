@@ -165,13 +165,35 @@ function updateCameraFromScroll() {
     let currentRotationX;
     if (splitProgress > 0) {
         // Deuxième mouvement : compléter la rotation jusqu'à 180°
-        // On part de endRotationX (11°) et on continue jusqu'à -90° (90° - 180°)
         const remainingRotation = 180 - (scrollConfig.startRotationX - scrollConfig.endRotationX);
         currentRotationX = scrollConfig.endRotationX - (remainingRotation * splitProgress);
+        
+        // Calculer la distance de la caméra
+        const minDistance = scrollConfig.endDistance * 0.5; // Distance minimale (plus proche)
+        
+        // Calculer la progression du zoom basée uniquement sur la position de la section 2
+        const section2Progress = Math.max(0, Math.min(1, 1 - (secondSectionRect.top / viewportHeight)));
+        
+        // Calculer la distance actuelle en fonction de la progression de la section 2
+        const currentDistance = scrollConfig.startDistance + 
+                              (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
+        
+        // Appliquer le zoom supplémentaire uniquement pendant la section 2
+        if (section2Progress < 1) {
+            camera.position.z = currentDistance;
+        } else {
+            // Une fois la section 2 complètement visible, maintenir la distance finale
+            camera.position.z = scrollConfig.endDistance;
+        }
     } else {
         // Premier mouvement : de 90° à 11°
         currentRotationX = scrollConfig.startRotationX + 
                           (scrollConfig.endRotationX - scrollConfig.startRotationX) * rotationProgress;
+        
+        // Distance normale pendant la première étape
+        const currentDistance = scrollConfig.startDistance + 
+                              (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
+        camera.position.z = currentDistance;
     }
     
     // Convertir les degrés en radians et appliquer la rotation

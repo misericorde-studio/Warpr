@@ -41,14 +41,16 @@ const config = {
     
     // NOUVEAU: Paramètres pour les cercles supplémentaires
     additionalCircles: 4,      // 3 blancs + 1 vert (le cercle intérieur compte comme un blanc)
-    additionalCircleParticles: 450, // Nombre de particules par cercle supplémentaire
+    whiteCircleParticles: 100, // Nombre de particules pour les cercles blancs
+    greenCircleParticles: 200, // Nombre de particules pour le cercle vert
+    whiteCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles blancs
+    greenCircleParticleScale: 0.8, // Facteur d'échelle pour les particules du cercle vert
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
-    additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
     
     // Configuration pour l'animation de division
     splitAnimation: {
         gridSize: 3, // 3x3 grid
-        spacing: 1.5, // Espacement entre les cercles
+        spacing: 1.25, // Espacement entre les cercles
         circleRadius: 0.15, // Rayon plus petit des petits cercles (était 0.2)
         circleFill: 0.9, // Remplissage des petits cercles (0-1)
         transitionDuration: 1.0, // Durée de la transition
@@ -266,8 +268,6 @@ function updateCameraFromScroll() {
         if (particle.isAdditionalCircle) {
             if (!processedIndices.has(particle.additionalCircleIndex)) {
                 processedIndices.add(particle.additionalCircleIndex);
-                console.log('Additional circle index:', particle.additionalCircleIndex, 
-                           particle.additionalCircleIndex === 1 ? '(green)' : '(white)');
             }
             
             // Mettre à jour l'opacité des cercles blancs avec la progression accélérée
@@ -291,9 +291,6 @@ function updateCameraFromScroll() {
             }
         }
     });
-    
-    // Log une fois par frame le nombre total de cercles
-    console.log('Circles found - Inner circle and indices:', Array.from(processedIndices).sort().join(', '));
     
     // Forcer la mise à jour des attributs de géométrie
     innerGeometry.attributes.position.needsUpdate = true;
@@ -557,11 +554,14 @@ class Particle {
                 }
             }
             
-            // Taille des particules
+            // Taille des particules avec la nouvelle échelle
             if (this.isInnerCircle) {
                 this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
             } else if (this.isAdditionalCircle) {
-                this.size = config.baseParticleSize * config.additionalCircleParticleScale * (0.7 + Math.random() * 0.6);
+                const scale = this.additionalCircleIndex === 1 ? 
+                    config.greenCircleParticleScale : 
+                    config.whiteCircleParticleScale;
+                this.size = config.baseParticleSize * scale * (0.7 + Math.random() * 0.6);
             }
             this.currentSize = this.size;
             
@@ -814,12 +814,17 @@ function createParticles() {
     
     // Créer les particules pour les cercles supplémentaires
     for (let circleIndex = 0; circleIndex < config.additionalCircles; circleIndex++) {
-        for (let i = 0; i < config.additionalCircleParticles; i++) {
+        // Déterminer le nombre de particules et l'échelle en fonction du type de cercle
+        const particleCount = circleIndex === 1 ? config.greenCircleParticles : config.whiteCircleParticles;
+        const particleScale = circleIndex === 1 ? config.greenCircleParticleScale : config.whiteCircleParticleScale;
+        
+        for (let i = 0; i < particleCount; i++) {
             const particle = new Particle(index++);
             particle.isInnerCircle = false;
             particle.isAdditionalCircle = true;
             particle.additionalCircleIndex = circleIndex;
             particle.isStatic = true;
+            particle.particleScale = particleScale;
             particle.resetParticle();
             particles.push(particle);
         }
@@ -849,16 +854,6 @@ function createParticles() {
         particle.resetParticle();
         particles.push(particle);
     }
-    
-    // Log du nombre de particules par type
-    const centralCircleParticles = particles.filter(p => 
-        p.isAdditionalCircle && p.additionalCircleIndex === 2
-    ).length;
-    
-    console.log(`Statistiques des particules:
-    - Total: ${particles.length}
-    - Cercle central (index 2): ${centralCircleParticles}
-    - Position Y du cercle central: ${-2 * config.additionalCircleVerticalSpacing}`);
     
     return particles;
 }
@@ -951,16 +946,31 @@ function updatePerformanceStats(currentTime) {
         const frameTime = (fpsTime / frameCount).toFixed(2);
         const activeParticles = particles.filter(p => p.active).length;
         
-        // Mettre à jour l'affichage
-        document.getElementById('fps-value').textContent = fps;
-        document.getElementById('frame-time-value').textContent = `${frameTime} ms`;
-        document.getElementById('particles-value').textContent = activeParticles;
+        // Récupérer les éléments DOM
+        const fpsElement = document.getElementById('fps-value');
+        const frameTimeElement = document.getElementById('frame-time-value');
+        const particlesElement = document.getElementById('particles-value');
+        const memoryElement = document.getElementById('memory-value');
+        
+        // Vérifier si les éléments existent avant de mettre à jour
+        if (fpsElement) {
+            fpsElement.textContent = fps;
+        }
+        if (frameTimeElement) {
+            frameTimeElement.textContent = `${frameTime} ms`;
+        }
+        if (particlesElement) {
+            particlesElement.textContent = activeParticles;
+        }
         
         // Afficher l'utilisation de la mémoire si disponible
-        if (window.performance && window.performance.memory) {
+        if (window.performance && window.performance.memory && memoryElement) {
             const memory = formatMemorySize(window.performance.memory.usedJSHeapSize);
-            document.getElementById('memory-value').textContent = `${memory} MB`;
+            memoryElement.textContent = `${memory} MB`;
         }
+        
+        // Log pour le débogage
+        console.log(`Performance Stats - FPS: ${fps}, Frame Time: ${frameTime}ms, Active Particles: ${activeParticles}`);
         
         // Réinitialiser les compteurs
         frameCount = 0;
@@ -1114,57 +1124,132 @@ function setupControls() {
             config[property] = value;
             valueDisplay.textContent = value.toFixed(2);
             
-            // Pour le nombre de particules, recréer les particules
-            if (['innerCircleParticles', 'outerCircleParticles'].includes(property)) {
-                if (property === 'innerCircleParticles') {
-                    config.additionalCircleParticles = value;
-                }
+            // Liste des propriétés qui nécessitent une recréation complète des particules
+            const recreateProperties = [
+                'innerCircleParticles',
+                'outerCircleParticles',
+                'whiteCircleParticles',
+                'greenCircleParticles',
+                'whiteCircleParticleScale',
+                'greenCircleParticleScale'
+            ];
+            
+            // Liste des propriétés qui nécessitent une réinitialisation des particules
+            const resetProperties = [
+                'innerRadius',
+                'outerRadius',
+                'additionalCircleVerticalSpacing',
+                'staticRingWidth',
+                'outerOutwardRatio',
+                'innerCircleFill',
+                'outerCircleParticleSize',
+                'baseParticleSize'
+            ];
+            
+            console.log(`Modification de ${property} à ${value}`);
+            
+            // Si la propriété nécessite une recréation complète
+            if (recreateProperties.includes(property)) {
+                console.log(`Recréation des particules pour ${property}`);
                 recreateParticles();
             }
-            
-            // Appliquer les changements selon le paramètre
-            if (['innerRadius', 'outerRadius', 'additionalCircleVerticalSpacing'].includes(property)) {
-                // Réinitialiser uniquement les particules, les cercles guides n'existent plus
-                for (let i = 0; i < particles.length; i++) {
-                    particles[i].resetParticle();
-                }
-            }
-            
-            // Pour certains paramètres, réinitialiser les particules
-            if (['staticRingWidth', 'outerOutwardRatio', 'innerCircleFill', 'outerCircleParticleSize'].includes(property)) {
-                for (let i = 0; i < particles.length; i++) {
-                    particles[i].resetParticle();
-                }
+            // Si la propriété nécessite une réinitialisation
+            else if (resetProperties.includes(property)) {
+                console.log(`Réinitialisation des particules pour ${property}`);
+                particles.forEach(particle => {
+                    particle.resetParticle();
+                });
             }
             
             // Pour la perspective, recréer le matériau
             if (property === 'perspectiveEffect') {
-                scene.remove(particlesObject);
-                particlesMaterial = createParticlesMaterial();
-                particlesObject = new THREE.Points(geometry, particlesMaterial);
-                particlesGroup.add(particlesObject);
-            }
-            
-            // Pour la taille des particules
-            if (property === 'baseParticleSize') {
-                for (let i = 0; i < particles.length; i++) {
-                    particles[i].size = value * (0.7 + Math.random() * 0.6);
-                }
+                innerMaterial = createParticlesMaterial();
+                outerMaterial = createParticlesMaterial();
+                
+                // Mettre à jour les matériaux des objets Points
+                particlesGroup.children.forEach(points => {
+                    if (points instanceof THREE.Points) {
+                        points.material = points === innerParticlesObject ? innerMaterial : outerMaterial;
+                    }
+                });
             }
         });
     };
 
     // Fonction pour recréer le système de particules
     function recreateParticles() {
-        console.log("Recréation des particules...");
+        console.log("Recréation des particules avec les nouveaux paramètres...");
+        console.log("Nombre de particules vertes:", config.greenCircleParticles);
+        console.log("Nombre de particules blanches:", config.whiteCircleParticles);
         
+        // Créer les nouvelles particules
         particles = createParticles();
         
-        scene.remove(particlesObject);
-        ({ geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry());
-        particlesMaterial = createParticlesMaterial();
-        particlesObject = new THREE.Points(geometry, particlesMaterial);
-        particlesGroup.add(particlesObject);
+        // Séparer les particules en deux groupes
+        outerParticles = particles.filter(p => !p.isInnerCircle && !p.isAdditionalCircle);
+        innerParticles = particles.filter(p => p.isInnerCircle || p.isAdditionalCircle);
+        
+        // Supprimer les anciens groupes
+        scene.remove(particlesGroup);
+        
+        // Créer les nouvelles géométries
+        innerGeometry = new THREE.BufferGeometry();
+        outerGeometry = new THREE.BufferGeometry();
+        
+        // Initialiser les attributs pour la géométrie intérieure
+        const innerPositions = new Float32Array(innerParticles.length * 3);
+        const innerSizes = new Float32Array(innerParticles.length);
+        const innerColors = new Float32Array(innerParticles.length * 3);
+        const innerOpacities = new Float32Array(innerParticles.length);
+        
+        // Initialiser les attributs pour la géométrie extérieure
+        const outerPositions = new Float32Array(outerParticles.length * 3);
+        const outerSizes = new Float32Array(outerParticles.length);
+        const outerColors = new Float32Array(outerParticles.length * 3);
+        const outerOpacities = new Float32Array(outerParticles.length);
+        
+        // Configurer les attributs des géométries
+        innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
+        innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
+        innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
+        innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
+        
+        outerGeometry.setAttribute('position', new THREE.BufferAttribute(outerPositions, 3));
+        outerGeometry.setAttribute('size', new THREE.BufferAttribute(outerSizes, 1));
+        outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
+        outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
+        
+        // Créer les matériaux
+        innerMaterial = createParticlesMaterial();
+        outerMaterial = createParticlesMaterial();
+        
+        // Créer les objets Points
+        const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
+        const outerParticlesObject = new THREE.Points(outerGeometry, outerMaterial);
+        
+        // Créer le groupe pour le cercle extérieur
+        outerCircleGroup = new THREE.Group();
+        outerCircleGroup.add(outerParticlesObject);
+        
+        // Créer le groupe principal
+        particlesGroup = new THREE.Group();
+        particlesGroup.add(innerParticlesObject);
+        particlesGroup.add(outerCircleGroup);
+        
+        // Initialiser la rotation
+        particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
+        scene.add(particlesGroup);
+        
+        // Forcer une mise à jour des attributs
+        innerGeometry.attributes.position.needsUpdate = true;
+        innerGeometry.attributes.size.needsUpdate = true;
+        innerGeometry.attributes.color.needsUpdate = true;
+        innerGeometry.attributes.opacity.needsUpdate = true;
+        
+        outerGeometry.attributes.position.needsUpdate = true;
+        outerGeometry.attributes.size.needsUpdate = true;
+        outerGeometry.attributes.color.needsUpdate = true;
+        outerGeometry.attributes.opacity.needsUpdate = true;
     }
 
     // Gestion du bouton pour masquer/afficher les contrôles
@@ -1187,7 +1272,7 @@ function setupControls() {
     setupControl('innerCircleParticles', 'innerCircleParticles', 100, 1000, 50);
     setupControl('outerCircleParticles', 'outerCircleParticles', 100, 2000, 50);
     setupControl('baseParticleSize', 'baseParticleSize', 0.1, 1, 0.05);
-    setupControl('outerCircleParticleSize', 'outerCircleParticleSize', 0.1, 1, 0.05);
+    setupControl('outerCircleParticleSize', 'outerCircleParticleSize', 0, 1, 0.05);
     setupControl('outerCircleBorderParticleSize', 'outerCircleBorderParticleSize', 0.1, 1, 0.05);
     setupControl('innerBorderWidth', 'innerBorderWidth', 0.1, 1, 0.05);
     setupControl('outerBorderWidth', 'outerBorderWidth', 0.1, 1, 0.05);
@@ -1202,6 +1287,12 @@ function setupControls() {
     setupControl('perspectiveEffect', 'perspectiveEffect', 0, 1, 0.05);
     setupControl('minMobileRatio', 'minMobileRatio', 0.1, 0.7, 0.05);
     setupControl('additionalCircleVerticalSpacing', 'additionalCircleVerticalSpacing', 0.2, 1.5, 0.1);
+    
+    // Nouveaux contrôles pour les cercles additionnels
+    setupControl('whiteCircleParticles', 'whiteCircleParticles', 100, 1000, 50);
+    setupControl('greenCircleParticles', 'greenCircleParticles', 100, 1000, 50);
+    setupControl('whiteCircleParticleScale', 'whiteCircleParticleScale', 0.1, 2.0, 0.1);
+    setupControl('greenCircleParticleScale', 'greenCircleParticleScale', 0.1, 2.0, 0.1);
 }
 
 // Gestion du bouton pour afficher/masquer les indicateurs de caméra

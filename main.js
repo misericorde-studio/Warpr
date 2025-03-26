@@ -531,7 +531,7 @@ function createParticlesGeometry() {
         positions[idx + 2] = 0;
         // Taille par défaut
         sizes[i] = config.baseParticleSize;
-        // Couleur par défaut
+        // Couleur par défaut (va être remplacée dans la fonction animate)
         const color = new THREE.Color(config.particleColor);
         colors[idx] = color.r;
         colors[idx + 1] = color.g;
@@ -540,10 +540,10 @@ function createParticlesGeometry() {
         opacities[i] = 1.0;
     }
     
+    // Préparation des couleurs de base pour utilisation dans l'animation
     const baseColor = {
-        r: new THREE.Color(config.particleColor).r, 
-        g: new THREE.Color(config.particleColor).g, 
-        b: new THREE.Color(config.particleColor).b
+        main: new THREE.Color(config.particleColor),
+        split: new THREE.Color(config.splitCircleColor)
     };
     
     const geometry = new THREE.BufferGeometry();

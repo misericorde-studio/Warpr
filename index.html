@@ -173,56 +173,60 @@
             top: 10px;
             right: 10px;
             background-color: rgba(0, 0, 0, 0.7);
-            padding: 15px;
+            padding: 10px;
             border-radius: 5px;
-            width: 250px;
-            height: 90vh;
-            overflow: scroll;
+            width: 200px;
+            height: 80vh;
+            overflow-y: auto;
+            overflow-x: hidden;
             z-index: 2;
-            display: none;
+            font-size: 11px;
+            -webkit-overflow-scrolling: touch;
         }
         
         .control-group {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         
         label {
             display: block;
-            margin-bottom: 5px;
-            font-size: 12px;
+            margin-bottom: 3px;
+            font-size: 10px;
         }
         
         input[type="range"] {
             width: 100%;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
+            height: 4px;
         }
         
         .value-display {
-            font-size: 11px;
+            font-size: 9px;
             text-align: right;
         }
         
         h3 {
             margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 16px;
+            margin-bottom: 8px;
+            font-size: 12px;
             color: #00ffcc;
         }
         
         .control-section {
             border-top: 1px solid rgba(0, 255, 204, 0.3);
-            padding-top: 10px;
-            margin-top: 10px;
+            padding-top: 8px;
+            margin-top: 8px;
         }
         
         button {
             background-color: #00ffcc;
             border: none;
             color: #000;
-            padding: 5px 10px;
+            padding: 3px 8px;
             cursor: pointer;
             border-radius: 3px;
-            margin-top: 10px;
+            margin-top: 8px;
+            font-size: 10px;
         }
         
         /* Style pour les indicateurs de caméra */
@@ -298,7 +302,7 @@
         </div>
     </div>
     
-    <div id="controls">
+    <div id="controls" data-lenis-prevent>
         <h3>Paramètres</h3>
         
         <div class="control-section">
@@ -319,6 +323,36 @@
                 <label for="baseParticleSize">Taille des particules</label>
                 <input type="range" id="baseParticleSize" min="0.1" max="1" step="0.05" value="0.4">
                 <div class="value-display" id="baseParticleSizeValue">0.40</div>
+            </div>
+            <div class="control-group">
+                <label for="outerCircleParticleSize">Taille particules extérieures</label>
+                <input type="range" id="outerCircleParticleSize" min="0.1" max="1" step="0.05" value="0.4">
+                <div class="value-display" id="outerCircleParticleSizeValue">0.40</div>
+            </div>
+            <div class="control-group">
+                <label for="outerCircleBorderParticleSize">Taille particules de bordure</label>
+                <input type="range" id="outerCircleBorderParticleSize" min="0.1" max="1" step="0.05" value="0.5">
+                <div class="value-display" id="outerCircleBorderParticleSizeValue">0.50</div>
+            </div>
+            <div class="control-group">
+                <label for="innerBorderWidth">Largeur bordure intérieure</label>
+                <input type="range" id="innerBorderWidth" min="0.1" max="1" step="0.05" value="0.3">
+                <div class="value-display" id="innerBorderWidthValue">0.30</div>
+            </div>
+            <div class="control-group">
+                <label for="outerBorderWidth">Largeur bordure extérieure</label>
+                <input type="range" id="outerBorderWidth" min="0.1" max="1" step="0.05" value="0.3">
+                <div class="value-display" id="outerBorderWidthValue">0.30</div>
+            </div>
+            <div class="control-group">
+                <label for="innerBorderParticleRatio">Densité particules bordure int.</label>
+                <input type="range" id="innerBorderParticleRatio" min="0.05" max="0.3" step="0.05" value="0.15">
+                <div class="value-display" id="innerBorderParticleRatioValue">0.15</div>
+            </div>
+            <div class="control-group">
+                <label for="outerBorderParticleRatio">Densité particules bordure ext.</label>
+                <input type="range" id="outerBorderParticleRatio" min="0.05" max="0.3" step="0.05" value="0.15">
+                <div class="value-display" id="outerBorderParticleRatioValue">0.15</div>
             </div>
             <div class="control-group">
                 <label for="maxParticleDistance">Distance maximale</label>

@@ -6,34 +6,44 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     // Paramètres des cercles
     innerRadius: 0.5,           // Rayon du cercle intérieur
-    outerRadius: 6,           // Rayon du cercle extérieur
+    outerRadius: 4.70,           // Rayon du cercle extérieur
     
     // Paramètres des particules
     innerCircleParticles: 100, // Nombre de particules dans le cercle intérieur
-    outerCircleParticles: 1700, // Nombre de particules dans le cercle extérieur
+    outerCircleParticles: 2000, // Nombre de particules dans le cercle extérieur (augmenté)
     baseParticleSize: 0.6,    // Taille de base des particules
-    additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
-    particleColor: 0xffffff,  // Couleur des particules (blanc)
-    splitCircleColor: 0x00ffcc, // Couleur du cercle qui se scinde et des 9 cercles résultants (vert)
+    outerCircleParticleSize: 1, // Taille des particules du cercle extérieur
+    outerCircleBorderParticleSize: 0.5, // Taille des particules de la bordure
     
-    // Paramètres d'animation
-    maxParticleDistance: 3,   // Distance maximale que peuvent parcourir les particules depuis leur cercle
-    particleSpeed: 0.02,      // Vitesse de déplacement des particules
-    fadeWithDistance: 0.8,    // Réduction de taille avec la distance (0-1)
+    // Paramètres des bordures
+    innerBorderWidth: 0.3, // Largeur de la bordure intérieure
+    outerBorderWidth: 0.3, // Largeur de la bordure extérieure
+    innerBorderParticleRatio: 0.35, // Ratio de particules pour la bordure intérieure (augmenté à 35%)
+    outerBorderParticleRatio: 0.35, // Ratio de particules pour la bordure extérieure (augmenté à 35%)
     
     // Paramètres visuels
-    perspectiveEffect: 0.4,   // Effet de perspective (0-1)
-    staticRingWidth: 0.2,     // Largeur de l'anneau statique du cercle extérieur - FORTEMENT RÉDUIT pour minimiser les cercles visibles
-    outerOutwardRatio: 0.6,   // Proportion de particules se déplaçant vers l'extérieur (cercle extérieur)
-    innerCircleFill: 0.8,     // Proportion du rayon intérieur à remplir - RÉDUIT pour disperser les particules
+    perspectiveEffect: 0,   // Effet de perspective (0-1)
+    staticRingWidth: 0.75,     // Largeur de l'anneau statique du cercle extérieur
+    outerOutwardRatio: 0.6,   // Proportion de particules se déplaçant vers l'extérieur
+    innerCircleFill: 0.8,     // Proportion du rayon intérieur à remplir
+    
+    // Paramètres d'animation
+    maxParticleDistance: 1,   // Distance maximale que peuvent parcourir les particules
+    particleSpeed: 0.01,      // Vitesse de déplacement des particules
+    fadeWithDistance: 1,      // Réduction de taille avec la distance (0-1)
+    
+    // Paramètres de couleur
+    particleColor: 0xffffff,  // Couleur des particules (blanc)
+    splitCircleColor: 0x00ffcc, // Couleur du cercle qui se scinde
     
     // NOUVEAU: Paramètres de gestion du flux de particules
-    minMobileRatio: 0.7,      // Ratio minimum de particules mobiles - FORTEMENT AUGMENTÉ pour disperser davantage les particules
+    minMobileRatio: 0.7,      // Ratio minimum de particules mobiles
     
     // NOUVEAU: Paramètres pour les cercles supplémentaires
     additionalCircles: 4,      // Nombre de cercles supplémentaires
     additionalCircleParticles: 450, // Nombre de particules par cercle supplémentaire
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
+    additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
     
     // Configuration pour l'animation de division
     splitAnimation: {
@@ -425,62 +435,49 @@ class Particle {
     
     // Méthode pour réinitialiser spécifiquement une particule du cercle extérieur
     resetOuterParticle() {
-        this.radius = config.outerRadius;
+        const angle = Math.random() * Math.PI * 2;
         
-        // Angle aléatoire autour du cercle
-        this.angle = Math.random() * Math.PI * 2;
+        // Déterminer si c'est une particule de bordure et de quel type
+        const random = Math.random();
+        const isInnerBorder = random < config.innerBorderParticleRatio;
+        const isOuterBorder = !isInnerBorder && random < (config.innerBorderParticleRatio + config.outerBorderParticleRatio);
         
-        // Position initiale exactement sur le cercle ou légèrement variée
-        const radiusVariation = (Math.random() * 0.2) - 0.1;
-        this.radius += radiusVariation;
+        // Définir si la particule est statique ou mobile
+        this.isStatic = Math.random() > config.minMobileRatio;
         
+        if (isInnerBorder) {
+            // Particules de la bordure intérieure
+            const randomOffset = (Math.random() - 0.5) * (config.innerBorderWidth * 0.5);
+            this.radius = config.outerRadius - config.innerBorderWidth + randomOffset;
+            this.size = config.outerCircleBorderParticleSize * (0.8 + Math.random() * 0.4);
+        } else if (isOuterBorder) {
+            // Particules de la bordure extérieure
+            const randomOffset = (Math.random() - 0.5) * (config.outerBorderWidth * 0.5);
+            this.radius = config.outerRadius + config.outerBorderWidth + randomOffset;
+            this.size = config.outerCircleBorderParticleSize * (0.8 + Math.random() * 0.4);
+        } else {
+            // Particules normales du cercle extérieur
+            this.radius = config.outerRadius;
+            this.size = config.outerCircleParticleSize;
+        }
+        
+        this.angle = angle;
+        this.speed = (Math.random() * 0.5 + 0.5) * config.particleSpeed;
+        this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
+        
+        // Calculer la position directement
         this.x = Math.cos(this.angle) * this.radius;
         this.y = (Math.random() - 0.5) * 0.3; // Légère variation sur Y
         this.z = Math.sin(this.angle) * this.radius;
         
-        // MODIFICATION: Forcer un pourcentage fixe de particules mobiles
-        // Pour garantir un flux constant, nous réduisons la probabilité de particules statiques
-        if (Math.random() < config.staticRingWidth * 0.8) {
-            // Particule statique
-            this.isStatic = true;
-            this.direction = 0;
-            
-            // Taille de base pour les particules statiques
-            this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
-            this.currentSize = this.size;
-
-            // Initialiser le flottement pour les particules statiques non divisées
-            if (!this.hasBeenSplit) {
-                this.floatSpeed = 0.01 + Math.random() * 0.02;
-                this.floatPhase = Math.random() * Math.PI * 2;
-            }
-        } else {
-            // Particule mobile
-            this.isStatic = false;
-            
-            // Direction du mouvement
-            this.direction = -1; // Par défaut vers l'intérieur
-            
-            // MODIFICATION: Augmenter légèrement la probabilité que les particules aillent vers l'intérieur
-            // pour maintenir un flux constant vers le cercle intérieur
-            if (Math.random() < config.outerOutwardRatio * 0.9) {
-                this.direction = 1;
-            }
-            
-            // Taille de base pour les particules mobiles
-            this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
-            this.currentSize = this.size;
-            
-            // MODIFICATION: Vitesse légèrement plus variée pour éviter que toutes les particules
-            // n'atteignent le cercle intérieur en même temps
-            this.speed = config.particleSpeed * (0.7 + Math.random() * 0.6);
-        }
-        
-        // Distance parcourue depuis le cercle
         this.distanceTraveled = 0;
-        
-        // Marquer la particule comme active
         this.active = true;
+        this.currentSize = this.size;
+        
+        if (!this.hasBeenSplit) {
+            this.floatSpeed = 0.01 + Math.random() * 0.02;
+            this.floatPhase = Math.random() * Math.PI * 2;
+        }
     }
     
     update(deltaTime) {
@@ -1008,7 +1005,7 @@ function setupControls() {
             }
             
             // Pour certains paramètres, réinitialiser les particules
-            if (['staticRingWidth', 'outerOutwardRatio', 'innerCircleFill'].includes(property)) {
+            if (['staticRingWidth', 'outerOutwardRatio', 'innerCircleFill', 'outerCircleParticleSize'].includes(property)) {
                 for (let i = 0; i < particles.length; i++) {
                     particles[i].resetParticle();
                 }
@@ -1064,6 +1061,12 @@ function setupControls() {
     setupControl('innerCircleParticles', 'innerCircleParticles', 100, 1000, 50);
     setupControl('outerCircleParticles', 'outerCircleParticles', 100, 2000, 50);
     setupControl('baseParticleSize', 'baseParticleSize', 0.1, 1, 0.05);
+    setupControl('outerCircleParticleSize', 'outerCircleParticleSize', 0.1, 1, 0.05);
+    setupControl('outerCircleBorderParticleSize', 'outerCircleBorderParticleSize', 0.1, 1, 0.05);
+    setupControl('innerBorderWidth', 'innerBorderWidth', 0.1, 1, 0.05);
+    setupControl('outerBorderWidth', 'outerBorderWidth', 0.1, 1, 0.05);
+    setupControl('innerBorderParticleRatio', 'innerBorderParticleRatio', 0.05, 0.3, 0.05);
+    setupControl('outerBorderParticleRatio', 'outerBorderParticleRatio', 0.05, 0.3, 0.05);
     setupControl('maxParticleDistance', 'maxParticleDistance', 0.5, 5, 0.1);
     setupControl('particleSpeed', 'particleSpeed', 0.005, 0.05, 0.001);
     setupControl('fadeWithDistance', 'fadeWithDistance', 0, 1, 0.05);

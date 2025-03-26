@@ -48,9 +48,9 @@ const config = {
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
     
     // NOUVEAU: Paramètres pour les bordures des cercles additionnels
-    additionalCircleBorderRatio: 0.35, // Ratio de particules pour les bordures des cercles additionnels
+    additionalCircleBorderRatio: 0.45, // Ratio de particules pour les bordures des cercles additionnels
     additionalCircleBorderScale: 0.4,  // Échelle des particules de bordure pour les cercles additionnels
-    additionalCircleBorderWidth: 0.2,  // Largeur des bordures des cercles additionnels
+    additionalCircleBorderWidth: 0.15,  // Largeur des bordures des cercles additionnels
     
     // Configuration pour l'animation de division
     splitAnimation: {

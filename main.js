@@ -40,7 +40,7 @@ const config = {
     minMobileRatio: 0.7,      // Ratio minimum de particules mobiles
     
     // NOUVEAU: Paramètres pour les cercles supplémentaires
-    additionalCircles: 4,      // Nombre de cercles supplémentaires
+    additionalCircles: 4,      // 3 blancs + 1 vert (le cercle intérieur compte comme un blanc)
     additionalCircleParticles: 450, // Nombre de particules par cercle supplémentaire
     additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
     additionalCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles verticaux
@@ -219,7 +219,9 @@ function updateCameraFromScroll() {
     if (sections.length < 3) return;
     
     const secondSection = sections[1];
+    const thirdSection = sections[2];
     const secondSectionRect = secondSection.getBoundingClientRect();
+    const thirdSectionRect = thirdSection.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
     // Calculer la progression du scroll pour la section 2
@@ -228,7 +230,65 @@ function updateCameraFromScroll() {
     // Faire disparaître le cercle extérieur progressivement
     outerMaterial.transparent = true;
     outerMaterial.opacity = Math.max(0, 1 - section2Progress);
-    outerCircleGroup.visible = true; // Garder le groupe toujours visible pour une transition fluide
+    outerCircleGroup.visible = true;
+    
+    // Calculer la progression pour la section 3
+    const section3Progress = Math.min(Math.max(0, 1 - (thirdSectionRect.top / viewportHeight)), 1);
+    
+    // Calculer une progression d'opacité plus rapide (disparition plus tôt)
+    const opacityProgress = Math.min(1, section3Progress * 1.5);
+    
+    // Transition de l'espacement vertical des cercles
+    const startSpacing = 0.5;
+    const endSpacing = 2.5;
+    const currentSpacing = startSpacing + (endSpacing - startSpacing) * section3Progress;
+    
+    // Suivre les cercles uniques traités
+    const processedIndices = new Set();
+    
+    // Mettre à jour l'opacité et la position des cercles
+    innerParticles.forEach(particle => {
+        if (particle.isInnerCircle) {
+            particle.opacity = Math.max(0, 1 - opacityProgress);
+            // Le cercle intérieur est maintenant à +2 espacements du centre
+            particle.y = 2 * currentSpacing;
+        }
+        
+        if (particle.isAdditionalCircle) {
+            if (!processedIndices.has(particle.additionalCircleIndex)) {
+                processedIndices.add(particle.additionalCircleIndex);
+                console.log('Additional circle index:', particle.additionalCircleIndex, 
+                           particle.additionalCircleIndex === 1 ? '(green)' : '(white)');
+            }
+            
+            // Mettre à jour l'opacité des cercles blancs avec la progression accélérée
+            if (particle.additionalCircleIndex !== 1) {
+                particle.opacity = Math.max(0, 1 - opacityProgress);
+            }
+            
+            // Mettre à jour la position Y avec un espacement uniforme
+            if (particle.additionalCircleIndex === 1) {
+                // Le cercle vert au centre
+                particle.y = 0;
+            } else if (particle.additionalCircleIndex === 0) {
+                // Premier cercle blanc au-dessus du vert
+                particle.y = currentSpacing;
+            } else if (particle.additionalCircleIndex === 2) {
+                // Premier cercle blanc en dessous du vert
+                particle.y = -currentSpacing;
+            } else if (particle.additionalCircleIndex === 3) {
+                // Deuxième cercle blanc en dessous du vert
+                particle.y = -2 * currentSpacing;
+            }
+        }
+    });
+    
+    // Log une fois par frame le nombre total de cercles
+    console.log('Circles found - Inner circle and indices:', Array.from(processedIndices).sort().join(', '));
+    
+    // Forcer la mise à jour des attributs de géométrie
+    innerGeometry.attributes.position.needsUpdate = true;
+    innerGeometry.attributes.opacity.needsUpdate = true;
     
     // Calculer la progression du scroll pour la rotation
     let rotationProgress = 1 - (secondSectionRect.top / viewportHeight);
@@ -700,18 +760,21 @@ function createParticlesMaterial() {
                 float dist = length(gl_PointCoord - center);
                 
                 // Réduire encore plus la taille du cercle visible
-                float threshold = 0.25; // Valeur encore plus petite pour réduire davantage la taille des cercles
+                float threshold = 0.25;
                 
                 // Création d'un point lumineux plus petit avec une transition plus nette
                 float alpha = 1.0 - smoothstep(threshold, threshold + 0.03, dist);
                 
                 // Assombrir légèrement les bords pour atténuer l'effet de cercle vert
                 if (dist > threshold) {
-                    alpha *= 0.4; // Réduire l'opacité dans la zone de transition
+                    alpha *= 0.4;
                 }
                 
+                // Appliquer l'opacité de la particule
+                alpha *= vOpacity;
+                
                 // Couleur finale avec opacité contrôlée
-                gl_FragColor = vec4(vColor, alpha * vOpacity);
+                gl_FragColor = vec4(vColor, alpha);
                 
                 // Rejeter les fragments au-delà du seuil pour une coupure nette
                 if (dist > threshold + 0.03) discard;
@@ -719,7 +782,8 @@ function createParticlesMaterial() {
         `,
         transparent: true,
         depthTest: true,
-        depthWrite: false
+        depthWrite: false,
+        blending: THREE.NormalBlending
     });
 }
 
@@ -891,12 +955,14 @@ function animate() {
         
         innerGeometry.attributes.size.array[i] = particle.currentSize;
         
+        // Gérer la couleur
         const color = particle.isAdditionalCircle && particle.additionalCircleIndex === 1 ? 
             splitColor : mainColor;
         innerGeometry.attributes.color.array[idx] = color.r;
         innerGeometry.attributes.color.array[idx + 1] = color.g;
         innerGeometry.attributes.color.array[idx + 2] = color.b;
         
+        // Appliquer l'opacité directement depuis la particule
         innerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     

@@ -63,7 +63,7 @@ const config = {
         particleScale: 0.3, // Facteur d'échelle plus petit pour les particules des cercles de fin (était 0.5)
         currentSizeMultiplier: 1.0, // Variable pour contrôler la taille actuelle des particules en fonction du scroll
         otherCirclesOpacity: 1.0, // Opacité des autres cercles verticaux (contrôlée par le scroll)
-        borderParticleRatio: 0.35,    // Ratio de particules pour les bordures des petits cercles
+        borderParticleRatio: 0.6,    // Ratio de particules pour les bordures des petits cercles (augmenté de 0.35 à 0.6)
         borderParticleScale: 0.3,     // Échelle des particules de bordure pour les petits cercles
     }
 };
@@ -402,6 +402,7 @@ function updateSplitAnimation(progress) {
                 particle.isStatic = true;
                 particle.floatSpeed = 0.01 + Math.random() * 0.02;
                 particle.floatPhase = Math.random() * Math.PI * 2;
+                particle.isBorder = false; // Réinitialiser l'état de bordure
                 
                 // La taille est maintenant gérée par le multiplicateur global
                 
@@ -455,12 +456,22 @@ function updateSplitAnimation(progress) {
             const centerX = (col - (gridSize - 1) / 2) * config.splitAnimation.spacing;
             const centerZ = (row - (gridSize - 1) / 2) * config.splitAnimation.spacing;
             
+            // Déterminer si c'est une particule de bordure
+            particle.isBorder = Math.random() < config.splitAnimation.borderParticleRatio;
+            
             // Position dans le sous-cercle (distribution circulaire remplie)
             const particleIndexInSubCircle = index % particlesPerSubCircle;
             const angleInSubCircle = (particleIndexInSubCircle / particlesPerSubCircle) * Math.PI * 2;
             
-            // Distribution radiale pour remplir le cercle, pas seulement son contour
-            const radiusFactor = Math.pow(Math.random(), 0.5) * config.splitAnimation.circleFill;
+            // Distribution radiale en fonction du type de particule (bordure ou non)
+            let radiusFactor;
+            if (particle.isBorder) {
+                // Pour les particules de bordure, les placer près du bord du cercle
+                radiusFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2 pour créer une bordure épaisse
+            } else {
+                // Pour les particules normales, utiliser la distribution habituelle
+                radiusFactor = Math.pow(Math.random(), 0.5) * config.splitAnimation.circleFill;
+            }
             const finalRadius = config.splitAnimation.circleRadius * radiusFactor;
             
             // Calculer la position finale avec une forme de cercle rempli
@@ -468,6 +479,11 @@ function updateSplitAnimation(progress) {
                 x: centerX + Math.cos(angleInSubCircle) * finalRadius,
                 z: centerZ + Math.sin(angleInSubCircle) * finalRadius
             };
+            
+            // Ajuster la taille en fonction du type de particule
+            if (particle.isBorder) {
+                particle.size *= config.splitAnimation.borderParticleScale;
+            }
         }
         
         // Appliquer une courbe d'accélération pour une animation plus naturelle
@@ -485,8 +501,8 @@ function updateSplitAnimation(progress) {
         if (progress > 0.95) {
             // Si l'animation est presque terminée, finaliser l'état
             particle.isStatic = true;
-            particle.floatSpeed = 0; // Désactiver le flottement
-            particle.floatPhase = 0; // Réinitialiser la phase
+            particle.floatSpeed = particle.isBorder ? 0.02 + Math.random() * 0.03 : 0.01 + Math.random() * 0.02;
+            particle.floatPhase = Math.random() * Math.PI * 2;
         } else {
             // Pendant l'animation, maintenir l'état adéquat
             particle.isStatic = false; // Non statique pendant l'animation pour permettre un mouvement fluide

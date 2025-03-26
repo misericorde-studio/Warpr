@@ -96,17 +96,15 @@ controls.enabled = false;
 
 // Déclaration des variables globales
 let particles;
-let geometry;
-let positions;
-let sizes;
-let colors;
-let opacities;
-let baseColor;
-let particlesMaterial;
-let particlesObject;
+let innerParticles;  // Nouveau: tableau pour les particules intérieures
+let outerParticles;  // Nouveau: tableau pour les particules extérieures
+let innerGeometry;   // Nouveau: géométrie pour les cercles intérieurs
+let outerGeometry;   // Nouveau: géométrie pour le cercle extérieur
+let innerMaterial;   // Nouveau: matériau pour les cercles intérieurs
+let outerMaterial;   // Nouveau: matériau pour le cercle extérieur
 let particlesGroup;
+let outerCircleGroup;
 
-// Modifier la fonction init pour initialiser les particules et le groupe
 function init() {
     const canvasContainer = document.getElementById('canvas-container');
     if (canvasContainer) {
@@ -119,13 +117,56 @@ function init() {
         
         // Créer les particules
         particles = createParticles();
-        ({ geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry());
-        particlesMaterial = createParticlesMaterial();
-        particlesObject = new THREE.Points(geometry, particlesMaterial);
         
-        // Créer le groupe de particules et l'initialiser avec la bonne rotation
+        // Séparer les particules en deux groupes
+        outerParticles = particles.filter(p => !p.isInnerCircle && !p.isAdditionalCircle);
+        innerParticles = particles.filter(p => p.isInnerCircle || p.isAdditionalCircle);
+        
+        // Créer les géométries
+        innerGeometry = new THREE.BufferGeometry();
+        outerGeometry = new THREE.BufferGeometry();
+        
+        // Initialiser les attributs pour la géométrie intérieure
+        const innerPositions = new Float32Array(innerParticles.length * 3);
+        const innerSizes = new Float32Array(innerParticles.length);
+        const innerColors = new Float32Array(innerParticles.length * 3);
+        const innerOpacities = new Float32Array(innerParticles.length);
+        
+        // Initialiser les attributs pour la géométrie extérieure
+        const outerPositions = new Float32Array(outerParticles.length * 3);
+        const outerSizes = new Float32Array(outerParticles.length);
+        const outerColors = new Float32Array(outerParticles.length * 3);
+        const outerOpacities = new Float32Array(outerParticles.length);
+        
+        // Configurer les attributs des géométries
+        innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
+        innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
+        innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
+        innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
+        
+        outerGeometry.setAttribute('position', new THREE.BufferAttribute(outerPositions, 3));
+        outerGeometry.setAttribute('size', new THREE.BufferAttribute(outerSizes, 1));
+        outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
+        outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
+        
+        // Créer les matériaux
+        innerMaterial = createParticlesMaterial();
+        outerMaterial = createParticlesMaterial();
+        
+        // Créer les objets Points
+        const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
+        const outerParticlesObject = new THREE.Points(outerGeometry, outerMaterial);
+        
+        // Créer le groupe pour le cercle extérieur
+        outerCircleGroup = new THREE.Group();
+        outerCircleGroup.add(outerParticlesObject);
+        
+        // Créer le groupe principal
         particlesGroup = new THREE.Group();
-        particlesGroup.add(particlesObject);
+        particlesGroup.add(innerParticlesObject);
+        particlesGroup.add(outerCircleGroup);
+        
+        // Initialiser la rotation
         particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
         scene.add(particlesGroup);
         
@@ -139,17 +180,55 @@ function init() {
     }
 }
 
+// Nouvelle fonction pour créer des géométries séparées
+function createSeparateGeometries() {
+    const outerParticles = particles.filter(p => !p.isInnerCircle && !p.isAdditionalCircle);
+    const innerParticles = particles.filter(p => p.isInnerCircle || p.isAdditionalCircle);
+    
+    // Créer la géométrie pour le cercle extérieur
+    const outerGeometry = new THREE.BufferGeometry();
+    const outerPositions = new Float32Array(outerParticles.length * 3);
+    const outerSizes = new Float32Array(outerParticles.length);
+    const outerColors = new Float32Array(outerParticles.length * 3);
+    const outerOpacities = new Float32Array(outerParticles.length);
+    
+    // Créer la géométrie pour les cercles intérieurs
+    const innerGeometry = new THREE.BufferGeometry();
+    const innerPositions = new Float32Array(innerParticles.length * 3);
+    const innerSizes = new Float32Array(innerParticles.length);
+    const innerColors = new Float32Array(innerParticles.length * 3);
+    const innerOpacities = new Float32Array(innerParticles.length);
+    
+    // Initialiser les attributs
+    outerGeometry.setAttribute('position', new THREE.BufferAttribute(outerPositions, 3));
+    outerGeometry.setAttribute('size', new THREE.BufferAttribute(outerSizes, 1));
+    outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
+    outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
+    
+    innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
+    innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
+    innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
+    innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
+    
+    return { outerGeometry, innerGeometry };
+}
+
 // Fonction pour mettre à jour la position de la caméra en fonction du scroll
 function updateCameraFromScroll() {
-    // Obtenir les sections
     const sections = document.querySelectorAll('.airdrop_content');
     if (sections.length < 3) return;
     
     const secondSection = sections[1];
-    const thirdSection = sections[2];
     const secondSectionRect = secondSection.getBoundingClientRect();
-    const thirdSectionRect = thirdSection.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    
+    // Calculer la progression du scroll pour la section 2
+    const section2Progress = Math.min(Math.max(0, 1 - (secondSectionRect.top / viewportHeight)), 1);
+    
+    // Faire disparaître le cercle extérieur progressivement
+    outerMaterial.transparent = true;
+    outerMaterial.opacity = Math.max(0, 1 - section2Progress);
+    outerCircleGroup.visible = true; // Garder le groupe toujours visible pour une transition fluide
     
     // Calculer la progression du scroll pour la rotation
     let rotationProgress = 1 - (secondSectionRect.top / viewportHeight);
@@ -158,17 +237,21 @@ function updateCameraFromScroll() {
     // Calculer la progression du scroll pour la division des cercles
     let splitProgress = 0;
     
-    if (thirdSectionRect.top <= viewportHeight) {
-        splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
-        splitProgress = Math.max(0, Math.min(1, splitProgress));
-        
-        config.splitAnimation.active = true;
-        config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
-        config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
-    } else {
-        config.splitAnimation.active = false;
-        config.splitAnimation.currentSizeMultiplier = 1.0;
-        config.splitAnimation.otherCirclesOpacity = 1.0;
+    if (sections[2]) {
+        const thirdSection = sections[2];
+        const thirdSectionRect = thirdSection.getBoundingClientRect();
+        if (thirdSectionRect.top <= viewportHeight) {
+            splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
+            splitProgress = Math.max(0, Math.min(1, splitProgress));
+            
+            config.splitAnimation.active = true;
+            config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
+            config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
+        } else {
+            config.splitAnimation.active = false;
+            config.splitAnimation.currentSizeMultiplier = 1.0;
+            config.splitAnimation.otherCirclesOpacity = 1.0;
+        }
     }
     
     // Calculer la rotation X actuelle
@@ -784,158 +867,92 @@ let hasScrolled = false;
 function animate() {
     requestAnimationFrame(animate);
     
-    // Mettre à jour la position de la caméra en fonction du scroll uniquement si l'utilisateur a défilé
     if (hasScrolled) {
         updateCameraFromScroll();
     }
     
-    // Compteur de particules pour diagnostic
-    let inactiveCount = 0;
-    let innerCount = 0;
-    let additionalCount = 0;
-    let outerCount = 0;
-    let movingCount = 0;
-    let centralCircleCount = 0; // Compteur pour le cercle central (index 1)
-    
-    // Créer des couleurs THREE.js à partir des valeurs hexadécimales
     const mainColor = new THREE.Color(config.particleColor);
     const splitColor = new THREE.Color(config.splitCircleColor);
     
-    // Mise à jour des particules
-    for (let i = 0; i < particles.length; i++) {
-        const particle = particles[i];
-        
-        // Ne jamais désactiver les particules du cercle central (index 1)
-        if (particle.isAdditionalCircle && particle.additionalCircleIndex === 1) {
-            particle.active = true;
-            centralCircleCount++;
-            
-            // Appliquer le multiplicateur de taille global pour les particules du cercle central
-            // Cela permet une transition fluide de la taille liée directement au scroll
-            particle.currentSize = particle.size * config.splitAnimation.currentSizeMultiplier;
-        }
-        
-        // Gérer l'opacité des cercles verticaux et du cercle principal (en haut)
-        if (particle.isAdditionalCircle || particle.isInnerCircle) {
-            // Le cercle qui se scinde (index 1) reste toujours visible
-            if (particle.isAdditionalCircle && particle.additionalCircleIndex === 1) {
-                particle.active = true;
-                particle.opacity = 1.0; // Toujours complètement visible
-            } 
-            // Tous les autres cercles (y compris le cercle principal et les autres verticaux) deviennent progressivement transparents
-            else {
-                // Si l'opacité est presque nulle, désactiver complètement la particule
-                if (config.splitAnimation.otherCirclesOpacity < 0.05) {
-                    particle.active = false;
-                } else {
-                    particle.active = true;
-                    
-                    // Appliquer l'opacité actuelle basée sur le scroll
-                    particle.opacity = config.splitAnimation.otherCirclesOpacity;
-                }
-            }
-        }
-        
-        // Ne mettre à jour que les particules non statiques et actives
-        if (!particle.isStatic && particle.active) {
-            particle.update(0.016); // Environ 60 FPS
-        }
-        
-        // Compter les types de particules pour diagnostic
-        if (!particle.active) inactiveCount++;
-        if (particle.isInnerCircle) innerCount++;
-        if (particle.isAdditionalCircle) additionalCount++;
-        if (!particle.isInnerCircle && !particle.isAdditionalCircle) outerCount++;
-        if (!particle.isStatic) movingCount++;
-        
-        // Mettre à jour la position dans le buffer UNIQUEMENT si la particule est active
-        // OU si elle appartient au cercle central (pour garantir sa visibilité)
-        if (particle.active || (particle.isAdditionalCircle && particle.additionalCircleIndex === 1)) {
-            const idx = i * 3;
-            positions[idx] = particle.x;
-            positions[idx + 1] = particle.y;
-            positions[idx + 2] = particle.z;
-            
-            // Mettre à jour la taille
-            sizes[i] = particle.currentSize;
-            
-            // Mettre à jour la couleur - utiliser la couleur verte pour le cercle qui se scinde
-            if ((particle.isAdditionalCircle && particle.additionalCircleIndex === 1) || particle.hasBeenSplit) {
-                // Appliquer la couleur verte au cercle qui se scinde et aux particules divisées
-                colors[idx] = splitColor.r;
-                colors[idx + 1] = splitColor.g;
-                colors[idx + 2] = splitColor.b;
-            } else {
-                // Utiliser la couleur principale pour les autres particules
-                colors[idx] = mainColor.r;
-                colors[idx + 1] = mainColor.g;
-                colors[idx + 2] = mainColor.b;
-            }
-            
-            // Mettre à jour l'opacité
-            opacities[i] = particle.opacity !== undefined ? particle.opacity : 1.0;
-        } else {
-            // Pour les particules inactives, les déplacer hors de la vue
-            const idx = i * 3;
-            positions[idx] = 0;
-            positions[idx + 1] = -1000; // Très loin en dessous
-            positions[idx + 2] = 0;
-            sizes[i] = 0; // Taille nulle
-            opacities[i] = 0; // Opacité nulle
-        }
-    }
+    let movingCount = 0;
     
-    // Log de diagnostic pour le cercle central (toutes les 120 frames)
-    if (frameCount % 120 === 0) {
-        console.log(`Particules du cercle central (index 1): ${centralCircleCount}, actives: ${centralCircleCount - inactiveCount}`);
-    }
+    // Mettre à jour les particules intérieures
+    innerParticles.forEach((particle, i) => {
+        if (!particle.active) return;
+        
+        if (!particle.isStatic) {
+            particle.update(0.016);
+        }
+        
+        const idx = i * 3;
+        innerGeometry.attributes.position.array[idx] = particle.x;
+        innerGeometry.attributes.position.array[idx + 1] = particle.y;
+        innerGeometry.attributes.position.array[idx + 2] = particle.z;
+        
+        innerGeometry.attributes.size.array[i] = particle.currentSize;
+        
+        const color = particle.isAdditionalCircle && particle.additionalCircleIndex === 1 ? 
+            splitColor : mainColor;
+        innerGeometry.attributes.color.array[idx] = color.r;
+        innerGeometry.attributes.color.array[idx + 1] = color.g;
+        innerGeometry.attributes.color.array[idx + 2] = color.b;
+        
+        innerGeometry.attributes.opacity.array[i] = particle.opacity;
+    });
     
-    // AJOUT: Vérifier si le nombre de particules mobiles est trop bas
-    // et forcer la réinitialisation de certaines particules statiques en particules mobiles
+    // Mettre à jour les particules extérieures
+    outerParticles.forEach((particle, i) => {
+        if (!particle.active) return;
+        
+        if (!particle.isStatic) {
+            particle.update(0.016);
+            movingCount++;
+        }
+        
+        const idx = i * 3;
+        outerGeometry.attributes.position.array[idx] = particle.x;
+        outerGeometry.attributes.position.array[idx + 1] = particle.y;
+        outerGeometry.attributes.position.array[idx + 2] = particle.z;
+        
+        outerGeometry.attributes.size.array[i] = particle.currentSize;
+        
+        outerGeometry.attributes.color.array[idx] = mainColor.r;
+        outerGeometry.attributes.color.array[idx + 1] = mainColor.g;
+        outerGeometry.attributes.color.array[idx + 2] = mainColor.b;
+        
+        outerGeometry.attributes.opacity.array[i] = outerMaterial.opacity;
+    });
+    
+    // Vérifier et réinitialiser les particules mobiles si nécessaire
     const minMobileParticles = Math.floor(config.outerCircleParticles * config.minMobileRatio);
-    
-    // Ne vérifier que si on est sous le seuil et pas trop fréquemment (tous les 10 frames)
     if (movingCount < minMobileParticles && frameCount % 10 === 0) {
-        // Calculer le nombre exact de particules à convertir
         const particlesToConvert = Math.min(50, minMobileParticles - movingCount);
-        
-        // Réinitialiser certaines particules du cercle extérieur pour les rendre mobiles
         let resetCount = 0;
         
-        // Calcul de l'index de début des particules du cercle extérieur
-        const outerCircleStartIndex = config.innerCircleParticles + (config.additionalCircles * config.additionalCircleParticles);
-        
-        for (let i = outerCircleStartIndex; i < particles.length && resetCount < particlesToConvert; i++) {
-            if (particles[i].isStatic) {
-                // Forcer cette particule statique du cercle extérieur à devenir mobile
-                particles[i].isStatic = false;
-                
-                // Favoriser les particules allant vers l'intérieur pour maintenir le flux
-                particles[i].direction = Math.random() < 0.7 ? -1 : 1;
-                
-                // Varier les vitesses pour un mouvement plus naturel
-                particles[i].speed = config.particleSpeed * (0.7 + Math.random() * 0.6);
-                
-                // Réinitialiser la distance parcourue
-                particles[i].distanceTraveled = 0;
-                
+        for (let i = 0; i < outerParticles.length && resetCount < particlesToConvert; i++) {
+            const particle = outerParticles[i];
+            if (particle.isStatic) {
+                particle.isStatic = false;
+                particle.direction = Math.random() < 0.7 ? -1 : 1;
+                particle.speed = config.particleSpeed * (0.7 + Math.random() * 0.6);
+                particle.distanceTraveled = 0;
                 resetCount++;
             }
         }
     }
     
-    // Mise à jour de la géométrie des particules
-    geometry.attributes.position.needsUpdate = true;
-    geometry.attributes.size.needsUpdate = true;
-    geometry.attributes.color.needsUpdate = true;
-    geometry.attributes.opacity.needsUpdate = true;
+    // Mettre à jour les géométries
+    innerGeometry.attributes.position.needsUpdate = true;
+    innerGeometry.attributes.size.needsUpdate = true;
+    innerGeometry.attributes.color.needsUpdate = true;
+    innerGeometry.attributes.opacity.needsUpdate = true;
     
-    // Mise à jour des indicateurs de caméra
-    updateCameraInfo();
+    outerGeometry.attributes.position.needsUpdate = true;
+    outerGeometry.attributes.size.needsUpdate = true;
+    outerGeometry.attributes.color.needsUpdate = true;
+    outerGeometry.attributes.opacity.needsUpdate = true;
     
     renderer.render(scene, camera);
-    
-    // Incrémenter le compteur de frames
     frameCount++;
 }
 

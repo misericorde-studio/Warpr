@@ -105,6 +105,15 @@ let outerMaterial;   // Nouveau: matériau pour le cercle extérieur
 let particlesGroup;
 let outerCircleGroup;
 
+// Animation
+let frameCount = 0; // Compteur de frames pour diagnostic et performances
+let lastTime = performance.now();
+let fpsTime = 0;
+const fpsUpdateInterval = 500; // Mettre à jour les FPS toutes les 500ms
+
+// Variable pour suivre si l'utilisateur a commencé à défiler
+let hasScrolled = false;
+
 function init() {
     const canvasContainer = document.getElementById('canvas-container');
     if (canvasContainer) {
@@ -922,13 +931,45 @@ function updateCameraInfo() {
     }
 }
 
-// Animation
-let frameCount = 0; // Compteur de frames pour diagnostic
+// Fonction pour formater la taille en MB
+function formatMemorySize(bytes) {
+    return (bytes / 1024 / 1024).toFixed(2);
+}
 
-// Variable pour suivre si l'utilisateur a commencé à défiler
-let hasScrolled = false;
+// Fonction pour mettre à jour les statistiques de performance
+function updatePerformanceStats(currentTime) {
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+    
+    // Mise à jour du compteur de frames
+    frameCount++;
+    fpsTime += deltaTime;
+    
+    // Mettre à jour les statistiques toutes les 500ms
+    if (fpsTime >= fpsUpdateInterval) {
+        const fps = Math.round((frameCount * 1000) / fpsTime);
+        const frameTime = (fpsTime / frameCount).toFixed(2);
+        const activeParticles = particles.filter(p => p.active).length;
+        
+        // Mettre à jour l'affichage
+        document.getElementById('fps-value').textContent = fps;
+        document.getElementById('frame-time-value').textContent = `${frameTime} ms`;
+        document.getElementById('particles-value').textContent = activeParticles;
+        
+        // Afficher l'utilisation de la mémoire si disponible
+        if (window.performance && window.performance.memory) {
+            const memory = formatMemorySize(window.performance.memory.usedJSHeapSize);
+            document.getElementById('memory-value').textContent = `${memory} MB`;
+        }
+        
+        // Réinitialiser les compteurs
+        frameCount = 0;
+        fpsTime = 0;
+    }
+}
 
 function animate() {
+    const currentTime = performance.now();
     requestAnimationFrame(animate);
     
     if (hasScrolled) {
@@ -1019,7 +1060,9 @@ function animate() {
     outerGeometry.attributes.opacity.needsUpdate = true;
     
     renderer.render(scene, camera);
-    frameCount++;
+    
+    // Ajouter le suivi des performances
+    updatePerformanceStats(currentTime);
 }
 
 // Initialiser les contrôles UI après le chargement du DOM

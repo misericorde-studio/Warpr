@@ -245,10 +245,63 @@
             display: none;
         }
         
+        #performance-stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #00ffcc;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'MonumentGroteskMono-Regular', monospace;
+            font-size: 12px;
+            z-index: 1000;
+            min-width: 200px;
+        }
+
+        #performance-stats h3 {
+            margin-bottom: 5px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+
+        .stat-label {
+            color: #888;
+        }
+
+        .stat-value {
+            color: #00ffcc;
+        }
 
     </style>
 </head>
 <body>
+    <div id="performance-stats">
+        <h3>Performance</h3>
+        <div class="stat-row">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps-value">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Frame Time:</span>
+            <span class="stat-value" id="frame-time-value">0 ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Active Particles:</span>
+            <span class="stat-value" id="particles-value">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Memory:</span>
+            <span class="stat-value" id="memory-value">0 MB</span>
+        </div>
+    </div>
+
     <div class="airdrop">
 
         <div class="airdrop_left">

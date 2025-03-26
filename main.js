@@ -66,6 +66,69 @@ const scrollConfig = {
 
 console.log("Configuration de l'animation au scroll:", scrollConfig);
 
+// Initialisation de la scène, caméra et renderer
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0B0E13);
+
+const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: true
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x000000, 0);
+
+// Contrôles d'orbite
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enabled = false;
+
+// Déclaration des variables globales
+let particles;
+let geometry;
+let positions;
+let sizes;
+let colors;
+let opacities;
+let baseColor;
+let particlesMaterial;
+let particlesObject;
+let particlesGroup;
+
+// Modifier la fonction init pour initialiser les particules et le groupe
+function init() {
+    const canvasContainer = document.getElementById('canvas-container');
+    if (canvasContainer) {
+        canvasContainer.innerHTML = '';
+        canvasContainer.appendChild(renderer.domElement);
+        
+        // Positionner la caméra de manière fixe
+        camera.position.set(0, 0, scrollConfig.startDistance);
+        camera.lookAt(0, 0, 0);
+        
+        // Créer les particules
+        particles = createParticles();
+        ({ geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry());
+        particlesMaterial = createParticlesMaterial();
+        particlesObject = new THREE.Points(geometry, particlesMaterial);
+        
+        // Créer le groupe de particules et l'initialiser avec la bonne rotation
+        particlesGroup = new THREE.Group();
+        particlesGroup.add(particlesObject);
+        particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
+        scene.add(particlesGroup);
+        
+        // Désactiver les contrôles d'orbite
+        controls.enabled = false;
+        
+        // Initialiser l'animation
+        animate();
+    } else {
+        console.error("Canvas container not found");
+    }
+}
+
 // Fonction pour mettre à jour la position de la caméra en fonction du scroll
 function updateCameraFromScroll() {
     // Obtenir les sections
@@ -78,100 +141,49 @@ function updateCameraFromScroll() {
     const thirdSectionRect = thirdSection.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
-    // Calculer la progression du scroll pour la rotation de la caméra
+    // Calculer la progression du scroll pour la rotation
     let rotationProgress = 1 - (secondSectionRect.top / viewportHeight);
     rotationProgress = Math.max(0, Math.min(1, rotationProgress));
     
     // Calculer la progression du scroll pour la division des cercles
     let splitProgress = 0;
-    let isScrollingUp = false; // Détection de la direction du scroll
-    
-    // Détecter si l'utilisateur scrolle vers le haut ou vers le bas
-    // Utiliser une variable statique pour stocker la dernière position
-    if (typeof updateCameraFromScroll.lastThirdSectionTop === 'undefined') {
-        updateCameraFromScroll.lastThirdSectionTop = thirdSectionRect.top;
-    }
-    isScrollingUp = thirdSectionRect.top > updateCameraFromScroll.lastThirdSectionTop;
-    updateCameraFromScroll.lastThirdSectionTop = thirdSectionRect.top;
     
     if (thirdSectionRect.top <= viewportHeight) {
         splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
         splitProgress = Math.max(0, Math.min(1, splitProgress));
         
-        // Activer l'animation de division
         config.splitAnimation.active = true;
-        
-        // Mettre à jour le multiplicateur de taille en fonction de splitProgress
-        // Faire une transition douce entre 1.0 et config.splitAnimation.particleScale
         config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
-        
-        // Réduire progressivement l'opacité des autres cercles verticaux
-        // L'opacité passe de 1.0 à 0.0 en synchronisation avec le scroll
         config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
-        
-        // Log de débogage
-        if (frameCount % 120 === 0) {
-            console.log(`Progrès de l'animation: ${splitProgress.toFixed(2)}, multiplicateur de taille: ${config.splitAnimation.currentSizeMultiplier.toFixed(2)}, opacité autres cercles: ${config.splitAnimation.otherCirclesOpacity.toFixed(2)}`);
-        }
     } else {
-        // Si on scrolle vers le haut et qu'on quitte la section 3
         config.splitAnimation.active = false;
-        
-        // Restaurer le multiplicateur de taille à 1.0
         config.splitAnimation.currentSizeMultiplier = 1.0;
-        
-        // Restaurer l'opacité des autres cercles verticaux à 1.0
         config.splitAnimation.otherCirclesOpacity = 1.0;
-        
-        if (frameCount % 120 === 0) {
-            console.log(`Section 3 non visible, scroll vers ${isScrollingUp ? 'le haut' : 'le bas'}`);
-        }
     }
     
     // Calculer la rotation X actuelle
     let currentRotationX;
     if (splitProgress > 0) {
-        // Deuxième mouvement : retour à 90°
-        currentRotationX = scrollConfig.endRotationX + (90 - scrollConfig.endRotationX) * splitProgress;
+        // Deuxième mouvement : compléter la rotation jusqu'à 180°
+        // On part de endRotationX (11°) et on continue jusqu'à -90° (90° - 180°)
+        const remainingRotation = 180 - (scrollConfig.startRotationX - scrollConfig.endRotationX);
+        currentRotationX = scrollConfig.endRotationX - (remainingRotation * splitProgress);
     } else {
         // Premier mouvement : de 90° à 11°
         currentRotationX = scrollConfig.startRotationX + 
                           (scrollConfig.endRotationX - scrollConfig.startRotationX) * rotationProgress;
     }
     
-    // Calcul de la distance actuelle (interpolation linéaire)
-    const currentDistance = scrollConfig.startDistance + 
-                          (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
-    
-    // Convertir les degrés en radians
+    // Convertir les degrés en radians et appliquer la rotation
     const angleInRadians = THREE.MathUtils.degToRad(currentRotationX);
+    particlesGroup.rotation.x = angleInRadians;
     
-    // Calculer la position du troisième cercle (index 1)
-    const targetY = -1 * config.additionalCircleVerticalSpacing;
-    
-    // Positionner la caméra en fonction de la rotation X
-    if (currentRotationX === 90) {
-        camera.position.set(0, currentDistance + targetY, 0);
-    } else {
-        const y = currentDistance * Math.sin(angleInRadians) + targetY;
-        const z = -currentDistance * Math.cos(angleInRadians);
-        camera.position.set(0, y, z);
-    }
-    
-    // Regarder vers le centre du troisième cercle
-    camera.lookAt(0, targetY, 0);
-    
-    // Mettre à jour l'animation de division avec le nouveau splitProgress
+    // Mettre à jour l'animation de division
     if (config.splitAnimation.active && splitProgress > 0) {
         updateSplitAnimation(splitProgress);
     } else if (!config.splitAnimation.active) {
-        // En cas de défilement vers le haut, utiliser un progrès inversement proportionnel
-        // pour créer une animation fluide du retour
         updateSplitAnimation(0);
     }
-    
-    // Mise à jour de l'information de caméra dans l'interface
-    updateCameraInfo();
 }
 
 // Fonction pour mettre à jour l'animation de division
@@ -294,24 +306,6 @@ function updateSplitAnimation(progress) {
     });
 }
 
-// Initialisation de la scène, caméra et renderer
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0B0E13);
-
-const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
-    alpha: true // Permettre la transparence
-});
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setClearColor(0x000000, 0); // Fond transparent
-
-// Contrôles d'orbite pour naviguer (désactivés par défaut)
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.enabled = false; // Désactiver les contrôles par défaut
-
 // Classe pour gérer chaque particule
 class Particle {
     constructor(index) {
@@ -348,11 +342,8 @@ class Particle {
     
     resetParticle() {
         if (this.isInnerCircle || this.isAdditionalCircle) {
-            // Comportement commun pour le cercle principal et les cercles supplémentaires
-            
             // Position aléatoire dans le cercle 
             const angle = Math.random() * Math.PI * 2;
-            // Distribution dans tout le cercle (pas seulement sur le contour)
             const radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill;
             this.radius = config.innerRadius * radiusFactor;
             
@@ -365,19 +356,30 @@ class Particle {
             
             // Position verticale (spécifique à chaque cercle)
             if (this.isInnerCircle) {
-                this.y = 0; // Le cercle principal est à y=0
-                
-                // Taille normale pour le cercle principal
-                this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
-                this.currentSize = this.size;
+                // Décaler le cercle principal vers le haut
+                this.y = 2 * config.additionalCircleVerticalSpacing;
             } else if (this.isAdditionalCircle) {
-                // Position avec décalage vertical selon l'index du cercle supplémentaire
-                this.y = -(this.additionalCircleIndex + 1) * config.additionalCircleVerticalSpacing;
-                
-                // Taille réduite pour les cercles verticaux
-                this.size = config.baseParticleSize * config.additionalCircleParticleScale * (0.7 + Math.random() * 0.6);
-                this.currentSize = this.size;
+                // Ajuster la position des cercles verticaux par rapport au cercle vert (index 1)
+                if (this.additionalCircleIndex === 1) {
+                    // Le cercle vert au centre
+                    this.y = 0;
+                } else if (this.additionalCircleIndex === 0) {
+                    // Premier cercle blanc au-dessus du vert
+                    this.y = config.additionalCircleVerticalSpacing;
+                } else {
+                    // Les deux cercles blancs en dessous du vert
+                    const offset = this.additionalCircleIndex - 1;
+                    this.y = -offset * config.additionalCircleVerticalSpacing;
+                }
             }
+            
+            // Taille des particules
+            if (this.isInnerCircle) {
+                this.size = config.baseParticleSize * (0.7 + Math.random() * 0.6);
+            } else if (this.isAdditionalCircle) {
+                this.size = config.baseParticleSize * config.additionalCircleParticleScale * (0.7 + Math.random() * 0.6);
+            }
+            this.currentSize = this.size;
             
             // Pas de direction pour les particules statiques
             this.direction = 0;
@@ -686,13 +688,6 @@ function createParticles() {
     return particles;
 }
 
-// Créer la géométrie et le matériau pour les particules
-let particles = createParticles();
-let { geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry();
-let particlesMaterial = createParticlesMaterial();
-let particlesObject = new THREE.Points(geometry, particlesMaterial);
-scene.add(particlesObject);
-
 // Version alternative sans créer de cercles guides
 function createGuideCircles() {
     // Créer un groupe vide (aucun cercle guide n'est créé)
@@ -925,43 +920,6 @@ function animate() {
     frameCount++;
 }
 
-// Modifier la fonction init pour placer le canvas dans le conteneur et initialiser la caméra à 90°
-function init() {
-    // Ajouter le canvas au conteneur
-    const canvasContainer = document.getElementById('canvas-container');
-    if (canvasContainer) {
-        // Vider le conteneur au cas où il y aurait déjà un canvas
-        canvasContainer.innerHTML = '';
-        canvasContainer.appendChild(renderer.domElement);
-        
-        // Calculer la position du troisième cercle (index 2)
-        const targetY = -2 * config.additionalCircleVerticalSpacing;
-        
-        // Positionner la caméra avec un angle X de 90 degrés (vue de dessus)
-        camera.position.set(0, scrollConfig.startDistance + targetY, 0);
-        camera.up.set(0, 0, 1); // Définir l'axe Z comme direction "vers le haut"
-        camera.lookAt(0, targetY, 0); // Regarder vers le centre du troisième cercle
-        
-        // Log de debug pour vérifier la position et rotation
-        const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'XYZ');
-        console.log(`Position initiale: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`);
-        console.log(`Rotation initiale - X: ${THREE.MathUtils.radToDeg(euler.x).toFixed(2)}°, Y: ${THREE.MathUtils.radToDeg(euler.y).toFixed(2)}°, Z: ${THREE.MathUtils.radToDeg(euler.z).toFixed(2)}°`);
-        console.log(`Distance initiale: ${camera.position.length().toFixed(2)}`);
-        
-        // Créer et ajouter les cercles guides
-        guideCircles = createGuideCircles();
-        scene.add(guideCircles);
-        
-        // Désactiver les contrôles d'orbite
-        controls.enabled = false;
-        
-        // Initialiser l'animation
-        animate();
-    } else {
-        console.error("Canvas container not found");
-    }
-}
-
 // Initialiser les contrôles UI après le chargement du DOM
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM chargé, initialisation...");
@@ -1039,7 +997,7 @@ function setupControls() {
                 scene.remove(particlesObject);
                 particlesMaterial = createParticlesMaterial();
                 particlesObject = new THREE.Points(geometry, particlesMaterial);
-                scene.add(particlesObject);
+                particlesGroup.add(particlesObject);
             }
             
             // Pour la taille des particules
@@ -1061,7 +1019,7 @@ function setupControls() {
         ({ geometry, positions, sizes, colors, opacities, baseColor } = createParticlesGeometry());
         particlesMaterial = createParticlesMaterial();
         particlesObject = new THREE.Points(geometry, particlesMaterial);
-        scene.add(particlesObject);
+        particlesGroup.add(particlesObject);
     }
 
     // Gestion du bouton pour masquer/afficher les contrôles

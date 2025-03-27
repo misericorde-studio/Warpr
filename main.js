@@ -87,7 +87,7 @@ console.log("Configuration de l'animation au scroll:", scrollConfig);
 
 // Initialisation de la scène, caméra et renderer
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0B0E13);
+scene.background = new THREE.Color(0x0C0E13);
 
 const renderer = new THREE.WebGLRenderer({ 
     antialias: true,
@@ -95,7 +95,10 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setClearColor(0x000000, 0);
+renderer.setClearColor(0x0C0E13, 1);
+// Utiliser l'espace sRGB pour correspondre au CSS
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
 
 // Contrôles d'orbite
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -167,9 +170,9 @@ function init() {
         outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
         outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
         
-        // Créer les matériaux
-        innerMaterial = createParticlesMaterial();
-        outerMaterial = createParticlesMaterial();
+        // Créer les matériaux avec des paramètres différents
+        innerMaterial = createParticlesMaterial(false); // Avec transparence pour les cercles intérieurs
+        outerMaterial = createParticlesMaterial(true);  // Sans transparence pour le cercle extérieur
         
         // Créer les objets Points
         const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
@@ -245,10 +248,22 @@ function updateCameraFromScroll() {
     // Calculer la progression du scroll pour la section 2
     const section2Progress = Math.min(Math.max(0, 1 - (secondSectionRect.top / viewportHeight)), 1);
     
-    // Faire disparaître le cercle extérieur progressivement
-    outerMaterial.transparent = true;
-    outerMaterial.opacity = Math.max(0, 1 - section2Progress);
-    outerCircleGroup.visible = true;
+    // Transition de couleur pour le cercle extérieur
+    const startColor = new THREE.Color(0xffffff);
+    const endColor = new THREE.Color(0x0C0E13);
+    // Debug: Afficher les composantes RGB exactes
+    console.log('End color RGB:', endColor.r.toFixed(4), endColor.g.toFixed(4), endColor.b.toFixed(4));
+    const currentColor = startColor.lerp(endColor, section2Progress);
+    
+    // Appliquer la couleur aux particules du cercle extérieur
+    outerParticles.forEach((particle, i) => {
+        const idx = i * 3;
+        outerGeometry.attributes.color.array[idx] = currentColor.r;
+        outerGeometry.attributes.color.array[idx + 1] = currentColor.g;
+        outerGeometry.attributes.color.array[idx + 2] = currentColor.b;
+        particle.color = currentColor;
+    });
+    outerGeometry.attributes.color.needsUpdate = true;
     
     // Calculer la progression pour la section 3
     const section3Progress = Math.min(Math.max(0, 1 - (thirdSectionRect.top / viewportHeight)), 1);
@@ -764,7 +779,7 @@ function createParticlesGeometry() {
 }
 
 // Créer le matériau pour les particules
-function createParticlesMaterial() {
+function createParticlesMaterial(isOuterCircle = false) {
     return new THREE.ShaderMaterial({
         uniforms: {
             cameraPos: { value: camera.position }
@@ -803,30 +818,31 @@ function createParticlesMaterial() {
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 
-                // Réduire encore plus la taille du cercle visible
+                // Réduire la taille du cercle visible
                 float threshold = 0.25;
                 
-                // Création d'un point lumineux plus petit avec une transition plus nette
-                float alpha = 1.0 - smoothstep(threshold, threshold + 0.03, dist);
+                // Création d'un point lumineux avec une transition nette
+                float alpha = 1.0 - smoothstep(threshold, threshold + 0.01, dist);
                 
-                // Assombrir légèrement les bords pour atténuer l'effet de cercle vert
-                if (dist > threshold) {
-                    alpha *= 0.4;
+                // Pour le cercle extérieur, pas de transparence
+                alpha = ${isOuterCircle ? '1.0' : 'alpha * vOpacity'};
+                
+                // Forcer les valeurs RGB exactes pour la couleur de fond
+                vec3 finalColor = vColor;
+                if(finalColor.r <= 0.05 && finalColor.g <= 0.06 && finalColor.b <= 0.08) {
+                    finalColor = vec3(0.047, 0.055, 0.075); // Valeurs exactes pour 0x0C0E13
                 }
                 
-                // Appliquer l'opacité de la particule
-                alpha *= vOpacity;
+                // Couleur finale
+                gl_FragColor = vec4(finalColor, alpha);
                 
-                // Couleur finale avec opacité contrôlée
-                gl_FragColor = vec4(vColor, alpha);
-                
-                // Rejeter les fragments au-delà du seuil pour une coupure nette
-                if (dist > threshold + 0.03) discard;
+                // Rejeter les fragments au-delà du seuil
+                if (dist > threshold + 0.01) discard;
             }
         `,
-        transparent: true,
+        transparent: !isOuterCircle,
         depthTest: true,
-        depthWrite: false,
+        depthWrite: isOuterCircle,
         blending: THREE.NormalBlending
     });
 }
@@ -1019,6 +1035,15 @@ function animate() {
     
     if (hasScrolled) {
         updateCameraFromScroll();
+    } else {
+        // Si on n'a pas encore scrollé, garder les particules blanches
+        outerParticles.forEach((particle, i) => {
+            const idx = i * 3;
+            outerGeometry.attributes.color.array[idx] = 1;     // R = 1 (blanc)
+            outerGeometry.attributes.color.array[idx + 1] = 1; // G = 1 (blanc)
+            outerGeometry.attributes.color.array[idx + 2] = 1; // B = 1 (blanc)
+        });
+        outerGeometry.attributes.color.needsUpdate = true;
     }
     
     const mainColor = new THREE.Color(config.particleColor);
@@ -1034,7 +1059,7 @@ function animate() {
             particle.update(0.016);
         }
         
-            const idx = i * 3;
+        const idx = i * 3;
         innerGeometry.attributes.position.array[idx] = particle.x;
         innerGeometry.attributes.position.array[idx + 1] = particle.y;
         innerGeometry.attributes.position.array[idx + 2] = particle.z;
@@ -1048,7 +1073,6 @@ function animate() {
         innerGeometry.attributes.color.array[idx + 1] = color.g;
         innerGeometry.attributes.color.array[idx + 2] = color.b;
         
-        // Appliquer l'opacité directement depuis la particule
         innerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     
@@ -1068,9 +1092,7 @@ function animate() {
         
         outerGeometry.attributes.size.array[i] = particle.currentSize;
         
-        outerGeometry.attributes.color.array[idx] = mainColor.r;
-        outerGeometry.attributes.color.array[idx + 1] = mainColor.g;
-        outerGeometry.attributes.color.array[idx + 2] = mainColor.b;
+        // Ne pas modifier la couleur ici, elle est gérée par updateCameraFromScroll
         
         outerGeometry.attributes.opacity.array[i] = outerMaterial.opacity;
     });
@@ -1263,8 +1285,8 @@ function setupControls() {
         outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
         
         // Créer les matériaux
-        innerMaterial = createParticlesMaterial();
-        outerMaterial = createParticlesMaterial();
+        innerMaterial = createParticlesMaterial(false); // Avec transparence pour les cercles intérieurs
+        outerMaterial = createParticlesMaterial(true);  // Sans transparence pour le cercle extérieur
         
         // Créer les objets Points
         const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);

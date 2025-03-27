@@ -253,8 +253,11 @@ function updateCameraFromScroll() {
         const startColor = new THREE.Color(0xffffff);
         const endColor = new THREE.Color(0x0C0E13);
         
+        // Modifier la progression pour commencer à 50%
+        const adjustedProgress = Math.max(0, (section2Progress - 0.5) * 2);
+        
         // Utiliser une courbe plus douce pour la transition
-        const smoothProgress = Math.pow(section2Progress, 0.5);
+        const smoothProgress = Math.pow(adjustedProgress, 0.5);
         
         // Interpoler la couleur
         const currentColor = startColor.clone().lerp(endColor, smoothProgress);

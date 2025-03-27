@@ -47,7 +47,7 @@ const config = {
     greenCircleParticles: 100, // Nombre de particules pour le cercle vert
     whiteCircleParticleScale: 0.8, // Facteur d'échelle pour les particules des cercles blancs
     greenCircleParticleScale: 0.9, // Facteur d'échelle pour les particules du cercle vert
-    additionalCircleVerticalSpacing: 0.5, // Espacement vertical entre les cercles
+    additionalCircleVerticalSpacing: 0.15, // Espacement vertical initial entre les cercles
     
     // NOUVEAU: Paramètres pour les bordures des cercles additionnels
     additionalCircleBorderRatio: 0.45, // Ratio de particules pour les bordures des cercles additionnels
@@ -302,9 +302,13 @@ function updateCameraFromScroll() {
     const opacityProgress = Math.min(1, section3Progress * 1.5);
     
     // Transition de l'espacement vertical des cercles
-    const startSpacing = 0.15;  // Réduit de 0.5 à 0.15 pour un espacement initial plus serré
+    const startSpacing = config.additionalCircleVerticalSpacing;  // Utiliser la même valeur que dans la config
     const endSpacing = 2.5;
     const currentSpacing = startSpacing + (endSpacing - startSpacing) * section3Progress;
+    
+    // Couleurs pour la transition
+    const startColor = new THREE.Color(0xffffff);
+    const endColor = new THREE.Color(0x0C0E13);
     
     // Suivre les cercles uniques traités
     const processedIndices = new Set();
@@ -312,7 +316,10 @@ function updateCameraFromScroll() {
     // Mettre à jour l'opacité et la position des cercles
     innerParticles.forEach(particle => {
         if (particle.isInnerCircle) {
-            particle.opacity = Math.max(0, 1 - opacityProgress);
+            // Transition de couleur pour le cercle intérieur
+            const currentColor = startColor.clone().lerp(endColor, opacityProgress);
+            particle.color = currentColor;
+            particle.opacity = 1.0; // Maintenir l'opacité à 1
             // Le cercle intérieur est maintenant à +2 espacements du centre
             particle.y = 2 * currentSpacing;
         }
@@ -322,9 +329,11 @@ function updateCameraFromScroll() {
                 processedIndices.add(particle.additionalCircleIndex);
             }
             
-            // Mettre à jour l'opacité des cercles blancs avec la progression accélérée
+            // Mettre à jour la couleur des cercles blancs avec la progression accélérée
             if (particle.additionalCircleIndex !== 1) {
-                particle.opacity = Math.max(0, 1 - opacityProgress);
+                const currentColor = startColor.clone().lerp(endColor, opacityProgress);
+                particle.color = currentColor;
+                particle.opacity = 1.0; // Maintenir l'opacité à 1
             }
             
             // Mettre à jour la position Y avec un espacement uniforme
@@ -346,6 +355,7 @@ function updateCameraFromScroll() {
     
     // Forcer la mise à jour des attributs de géométrie
     innerGeometry.attributes.position.needsUpdate = true;
+    innerGeometry.attributes.color.needsUpdate = true;
     innerGeometry.attributes.opacity.needsUpdate = true;
     
     // Calculer la progression du scroll pour la rotation
@@ -1106,7 +1116,7 @@ function animate() {
         
         // Gérer la couleur
         const color = particle.isAdditionalCircle && particle.additionalCircleIndex === 1 ? 
-            splitColor : mainColor;
+            splitColor : (particle.color || mainColor);
         innerGeometry.attributes.color.array[idx] = color.r;
         innerGeometry.attributes.color.array[idx + 1] = color.g;
         innerGeometry.attributes.color.array[idx + 2] = color.b;

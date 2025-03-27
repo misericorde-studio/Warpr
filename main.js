@@ -184,8 +184,8 @@ function init() {
         
         // Créer le groupe principal
         particlesGroup = new THREE.Group();
-        particlesGroup.add(innerParticlesObject);
         particlesGroup.add(outerCircleGroup);
+        particlesGroup.add(innerParticlesObject);
         
         // Initialiser la rotation
         particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
@@ -1324,8 +1324,8 @@ function setupControls() {
         
         // Créer le groupe principal
         particlesGroup = new THREE.Group();
-        particlesGroup.add(innerParticlesObject);
         particlesGroup.add(outerCircleGroup);
+        particlesGroup.add(innerParticlesObject);
         
         // Initialiser la rotation
         particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);

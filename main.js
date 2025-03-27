@@ -5,21 +5,21 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Configuration
 const config = {
     // Paramètres des cercles
-    innerRadius: 0.5,           // Rayon du cercle intérieur
-    outerRadius: 4.70,           // Rayon du cercle extérieur
+    innerRadius: 0.50,           // Rayon du cercle intérieur
+    outerRadius: 4.80,           // Rayon du cercle extérieur
     
     // Paramètres des particules
     innerCircleParticles: 100, // Nombre de particules dans le cercle intérieur
     outerCircleParticles: 2000, // Nombre de particules dans le cercle extérieur (augmenté)
-    baseParticleSize: 0.6,    // Taille de base des particules
-    outerCircleParticleSize: 1, // Taille des particules du cercle extérieur
-    outerCircleBorderParticleSize: 0.5, // Taille des particules de la bordure
+    baseParticleSize: 0.60,    // Taille de base des particules
+    outerCircleParticleSize: 0.75,     // Grosses particules pour le cercle principal
+    outerCircleBorderParticleSize: 0.75, // Petites particules pour les bordures
     
     // Paramètres des bordures
-    innerBorderWidth: 0.3, // Largeur de la bordure intérieure
-    outerBorderWidth: 0.3, // Largeur de la bordure extérieure
-    innerBorderParticleRatio: 0.35, // Ratio de particules pour la bordure intérieure (augmenté à 35%)
-    outerBorderParticleRatio: 0.35, // Ratio de particules pour la bordure extérieure (augmenté à 35%)
+    innerBorderWidth: 0.30,  // Largeur de la bordure intérieure
+    outerBorderWidth: 0.30,  // Largeur de la bordure extérieure
+    innerBorderParticleRatio: 0.20, // Ratio de particules pour les bordures
+    outerBorderParticleRatio: 0.20,
     
     // Paramètres visuels
     perspectiveEffect: 0,   // Effet de perspective (0-1)
@@ -29,7 +29,7 @@ const config = {
     
     // Paramètres d'animation
     maxParticleDistance: 1,   // Distance maximale que peuvent parcourir les particules
-    particleSpeed: 0.01,      // Vitesse de déplacement des particules
+    particleSpeed: 0.005,      // Vitesse de déplacement des particules
     fadeWithDistance: 1,      // Réduction de taille avec la distance (0-1)
     
     // Paramètres de couleur
@@ -147,44 +147,48 @@ function init() {
         innerGeometry = new THREE.BufferGeometry();
         outerGeometry = new THREE.BufferGeometry();
         
-        // Initialiser les attributs pour la géométrie intérieure
-        const innerPositions = new Float32Array(innerParticles.length * 3);
-        const innerSizes = new Float32Array(innerParticles.length);
-        const innerColors = new Float32Array(innerParticles.length * 3);
-        const innerOpacities = new Float32Array(innerParticles.length);
-        
         // Initialiser les attributs pour la géométrie extérieure
         const outerPositions = new Float32Array(outerParticles.length * 3);
         const outerSizes = new Float32Array(outerParticles.length);
         const outerColors = new Float32Array(outerParticles.length * 3);
         const outerOpacities = new Float32Array(outerParticles.length);
         
-        // Configurer les attributs des géométries
-        innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
-        innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
-        innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
-        innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
+        // Initialiser les attributs pour la géométrie intérieure
+        const innerPositions = new Float32Array(innerParticles.length * 3);
+        const innerSizes = new Float32Array(innerParticles.length);
+        const innerColors = new Float32Array(innerParticles.length * 3);
+        const innerOpacities = new Float32Array(innerParticles.length);
         
+        // Configurer les attributs des géométries
         outerGeometry.setAttribute('position', new THREE.BufferAttribute(outerPositions, 3));
         outerGeometry.setAttribute('size', new THREE.BufferAttribute(outerSizes, 1));
         outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
         outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
         
-        // Créer les matériaux avec des paramètres différents
-        innerMaterial = createParticlesMaterial(false); // Avec transparence pour les cercles intérieurs
-        outerMaterial = createParticlesMaterial(true);  // Sans transparence pour le cercle extérieur
+        innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
+        innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
+        innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
+        innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
+        
+        // Créer les matériaux
+        outerMaterial = createParticlesMaterial(false);  // Avec transparence pour le cercle extérieur
+        innerMaterial = createParticlesMaterial(true);   // Sans transparence pour les cercles intérieurs
         
         // Créer les objets Points
-        const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
         const outerParticlesObject = new THREE.Points(outerGeometry, outerMaterial);
+        const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
+        
+        // Créer le groupe principal
+        particlesGroup = new THREE.Group();
         
         // Créer le groupe pour le cercle extérieur
         outerCircleGroup = new THREE.Group();
         outerCircleGroup.add(outerParticlesObject);
         
-        // Créer le groupe principal
-        particlesGroup = new THREE.Group();
+        // Ajouter d'abord les particules extérieures (rendues en premier, donc derrière)
         particlesGroup.add(outerCircleGroup);
+        
+        // Ajouter ensuite les particules intérieures (rendues en dernier, donc devant)
         particlesGroup.add(innerParticlesObject);
         
         // Initialiser la rotation
@@ -663,47 +667,54 @@ class Particle {
     resetOuterParticle() {
         const angle = Math.random() * Math.PI * 2;
         
-        // Déterminer si c'est une particule de bordure et de quel type
+        // Déterminer le type de particule
         const random = Math.random();
         const isInnerBorder = random < config.innerBorderParticleRatio;
         const isOuterBorder = !isInnerBorder && random < (config.innerBorderParticleRatio + config.outerBorderParticleRatio);
+        const isMobile = !isInnerBorder && !isOuterBorder && !this.isStatic;
         
-        // Définir si la particule est statique ou mobile
-        this.isStatic = Math.random() > config.minMobileRatio;
-        
+        // Définir le rayon et la taille en fonction du type
         if (isInnerBorder) {
             // Particules de la bordure intérieure
-            const randomOffset = (Math.random() - 0.5) * (config.innerBorderWidth * 0.5);
-            this.radius = config.outerRadius - config.innerBorderWidth + randomOffset;
-            this.size = config.outerCircleBorderParticleSize * (0.8 + Math.random() * 0.4);
+            const randomOffset = (Math.random() - 0.5) * config.innerBorderWidth;
+            this.radius = config.outerRadius - config.innerBorderWidth/2 + randomOffset;
+            this.size = config.outerCircleBorderParticleSize;
+            this.isStatic = true;
         } else if (isOuterBorder) {
             // Particules de la bordure extérieure
-            const randomOffset = (Math.random() - 0.5) * (config.outerBorderWidth * 0.5);
-            this.radius = config.outerRadius + config.outerBorderWidth + randomOffset;
-            this.size = config.outerCircleBorderParticleSize * (0.8 + Math.random() * 0.4);
+            const randomOffset = (Math.random() - 0.5) * config.outerBorderWidth;
+            this.radius = config.outerRadius + config.outerBorderWidth/2 + randomOffset;
+            this.size = config.outerCircleBorderParticleSize;
+            this.isStatic = true;
+        } else if (isMobile) {
+            // Particules mobiles
+            this.radius = config.outerRadius;
+            this.size = config.mobileParticleSize;
+            this.isStatic = false;
         } else {
-            // Particules normales du cercle extérieur
+            // Particules statiques du cercle principal
             this.radius = config.outerRadius;
             this.size = config.outerCircleParticleSize;
+            this.isStatic = true;
         }
         
         this.angle = angle;
-        this.speed = (Math.random() * 0.5 + 0.5) * config.particleSpeed;
+        this.speed = config.particleSpeed * (0.8 + Math.random() * 0.4);
         this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
         
         // Calculer la position directement
         this.x = Math.cos(this.angle) * this.radius;
-        this.y = (Math.random() - 0.5) * 0.3; // Légère variation sur Y
+        this.y = (Math.random() - 0.5) * 0.3;
         this.z = Math.sin(this.angle) * this.radius;
         
         this.distanceTraveled = 0;
         this.active = true;
-            this.currentSize = this.size;
+        this.currentSize = this.size;
 
-            if (!this.hasBeenSplit) {
-                this.floatSpeed = 0.01 + Math.random() * 0.02;
-                this.floatPhase = Math.random() * Math.PI * 2;
-            }
+        if (!this.hasBeenSplit) {
+            this.floatSpeed = 0.01 + Math.random() * 0.02;
+            this.floatPhase = Math.random() * Math.PI * 2;
+        }
     }
     
     update(deltaTime) {
@@ -711,12 +722,10 @@ class Particle {
 
         // Cas spécial pour les particules du cercle central (index 1)
         if (this.isAdditionalCircle && this.additionalCircleIndex === 1) {
-            // Ne rien faire ici, la taille est contrôlée par updateSplitAnimation
             return;
         }
 
         if (this.isStatic) {
-            // Ajouter un flottement uniquement aux particules non divisées
             if (!this.hasBeenSplit) {
                 this.floatPhase += this.floatSpeed;
                 const float = Math.sin(this.floatPhase) * 0.15 + 1;
@@ -728,8 +737,8 @@ class Particle {
         // Déplacement des particules du cercle extérieur uniquement
         this.distanceTraveled += this.speed * this.direction;
         
-        // Si la particule a atteint sa distance maximale vers l'extérieur, la réinitialiser
-        if (this.direction > 0 && this.distanceTraveled > config.maxParticleDistance) {
+        // Si la particule a atteint sa distance maximale, la réinitialiser
+        if (Math.abs(this.distanceTraveled) > config.maxParticleDistance) {
             this.resetOuterParticle();
             return;
         }
@@ -751,9 +760,12 @@ class Particle {
         this.y += (Math.random() - 0.5) * 0.01;
         this.y *= 0.98; // Amortissement pour éviter une trop grande dispersion
         
-        // Facteur de taille basé sur la distance parcourue
-        const distanceFactor = 1.0 - (Math.abs(this.distanceTraveled) / config.maxParticleDistance) * config.fadeWithDistance;
-        this.currentSize = this.size * distanceFactor;
+        // Calcul de la taille basé sur la distance parcourue
+        const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
+        const sizeFactor = Math.max(0, 1 - distanceRatio);
+        
+        // Appliquer une courbe quadratique pour une diminution plus naturelle
+        this.currentSize = this.size * (sizeFactor * sizeFactor);
     }
 }
 
@@ -1118,9 +1130,8 @@ function animate() {
         
         outerGeometry.attributes.size.array[i] = particle.currentSize;
         
-        // Ne pas modifier la couleur ici, elle est gérée par updateCameraFromScroll
-        
-        outerGeometry.attributes.opacity.array[i] = outerMaterial.opacity;
+        // Appliquer l'opacité individuelle de la particule
+        outerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     
     // Vérifier et réinitialiser les particules mobiles si nécessaire

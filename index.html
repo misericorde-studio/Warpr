@@ -170,66 +170,106 @@
         
         #controls {
             position: fixed;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            width: 200px;
-            height: 80vh;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            transform: translateX(0);
+            transition: transform 0.3s ease-in-out;
+            z-index: 1000;
             overflow-y: auto;
-            overflow-x: hidden;
-            z-index: 2;
-            font-size: 11px;
-            -webkit-overflow-scrolling: touch;
-
-        }
-        
-        .control-group {
-            margin-bottom: 8px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 3px;
-            font-size: 10px;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            margin-bottom: 3px;
-            height: 4px;
-        }
-        
-        .value-display {
-            font-size: 9px;
-            text-align: right;
-        }
-        
-        h3 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-size: 12px;
-            color: #00ffcc;
         }
         
         .control-section {
-            border-top: 1px solid rgba(0, 255, 204, 0.3);
-            padding-top: 8px;
-            margin-top: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
-        button {
-            background-color: #00ffcc;
-            border: none;
-            color: #000;
-            padding: 3px 8px;
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
             cursor: pointer;
-            border-radius: 3px;
-            margin-top: 8px;
-            font-size: 10px;
+            user-select: none;
         }
-        
+
+        .section-header h4 {
+            margin: 0;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .section-content {
+            padding: 12px;
+            display: block;
+            transition: all 0.3s ease;
+        }
+
+        .section-content.collapsed {
+            display: none;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #fff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin: 4px 0;
+        }
+
+        .value-display {
+            color: #fff;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .toggle-section {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-section.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        #hideControls {
+            position: fixed;
+            top: 20px;
+            right: 340px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+            transition: right 0.3s;
+        }
+
+        #controls[style*="translateX"] ~ #hideControls {
+            right: 20px;
+        }
+
         /* Style pour les indicateurs de caméra */
         #camera-info {
             position: absolute;
@@ -278,6 +318,27 @@
 
         .stat-value {
             color: #00ffcc;
+        }
+
+        /* Style des checkboxes */
+        .checkbox-group {
+            margin-bottom: 8px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
         }
 
     </style>
@@ -359,161 +420,220 @@
     <div id="controls" data-lenis-prevent>
         <h3>Paramètres</h3>
         
+        <!-- Contrôles de visibilité -->
         <div class="control-section">
-            <div class="control-group">
-                <label for="innerRadius">Rayon cercle intérieur</label>
-                <input type="range" id="innerRadius" min="0.5" max="4" step="0.1" value="2">
-                <div class="value-display" id="innerRadiusValue">2.00</div>
+            <div class="section-header">
+                <h4>Visibilité</h4>
+                <button class="toggle-section">▼</button>
             </div>
-            <div class="control-group">
-                <label for="outerRadius">Rayon cercle extérieur</label>
-                <input type="range" id="outerRadius" min="3" max="10" step="0.1" value="6">
-                <div class="value-display" id="outerRadiusValue">6.00</div>
+            <div class="section-content">
+                <div class="control-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="showOuterCircle" checked>
+                        Cercle extérieur
+                    </label>
+                </div>
+                <div class="control-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="showBorders" checked>
+                        Bordures
+                    </label>
+                </div>
+                <div class="control-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="showMobileParticles" checked>
+                        Particules mobiles
+                    </label>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Cercle extérieur -->
         <div class="control-section">
-            <div class="control-group">
-                <label for="baseParticleSize">Taille des particules</label>
-                <input type="range" id="baseParticleSize" min="0.1" max="1" step="0.05" value="0.4">
-                <div class="value-display" id="baseParticleSizeValue">0.40</div>
+            <div class="section-header">
+                <h4>Cercle extérieur</h4>
+                <button class="toggle-section" data-target="outerCircleContent">▼</button>
             </div>
-            <div class="control-group">
-                <label for="outerCircleParticleSize">Taille particules extérieures</label>
-                <input type="range" id="outerCircleParticleSize" min="0.1" max="1" step="0.05" value="0.4">
-                <div class="value-display" id="outerCircleParticleSizeValue">0.40</div>
-            </div>
-            <div class="control-group">
-                <label for="outerCircleBorderParticleSize">Taille particules de bordure</label>
-                <input type="range" id="outerCircleBorderParticleSize" min="0.1" max="1" step="0.05" value="0.5">
-                <div class="value-display" id="outerCircleBorderParticleSizeValue">0.50</div>
-            </div>
-            <div class="control-group">
-                <label for="innerBorderWidth">Largeur bordure intérieure</label>
-                <input type="range" id="innerBorderWidth" min="0.1" max="1" step="0.05" value="0.3">
-                <div class="value-display" id="innerBorderWidthValue">0.30</div>
-            </div>
-            <div class="control-group">
-                <label for="outerBorderWidth">Largeur bordure extérieure</label>
-                <input type="range" id="outerBorderWidth" min="0.1" max="1" step="0.05" value="0.3">
-                <div class="value-display" id="outerBorderWidthValue">0.30</div>
-            </div>
-            <div class="control-group">
-                <label for="innerBorderParticleRatio">Densité particules bordure int.</label>
-                <input type="range" id="innerBorderParticleRatio" min="0.05" max="0.3" step="0.05" value="0.15">
-                <div class="value-display" id="innerBorderParticleRatioValue">0.15</div>
-            </div>
-            <div class="control-group">
-                <label for="outerBorderParticleRatio">Densité particules bordure ext.</label>
-                <input type="range" id="outerBorderParticleRatio" min="0.05" max="0.3" step="0.05" value="0.15">
-                <div class="value-display" id="outerBorderParticleRatioValue">0.15</div>
-            </div>
-            <div class="control-group">
-                <label for="maxParticleDistance">Distance maximale</label>
-                <input type="range" id="maxParticleDistance" min="0.5" max="5" step="0.1" value="3">
-                <div class="value-display" id="maxParticleDistanceValue">3.00</div>
-            </div>
-            <div class="control-group">
-                <label for="particleSpeed">Vitesse des particules</label>
-                <input type="range" id="particleSpeed" min="0.005" max="0.05" step="0.001" value="0.02">
-                <div class="value-display" id="particleSpeedValue">0.02</div>
-            </div>
-            <div class="control-group">
-                <label for="fadeWithDistance">Réduction de taille</label>
-                <input type="range" id="fadeWithDistance" min="0" max="1" step="0.05" value="0.8">
-                <div class="value-display" id="fadeWithDistanceValue">0.80</div>
-            </div>
-            <div class="control-group">
-                <label for="perspectiveEffect">Effet de perspective</label>
-                <input type="range" id="perspectiveEffect" min="0" max="1" step="0.05" value="0.4">
-                <div class="value-display" id="perspectiveEffectValue">0.40</div>
+            <div id="outerCircleContent" class="section-content">
+                <div class="control-group">
+                    <label for="outerRadius">Rayon du cercle extérieur</label>
+                    <input type="range" id="outerRadius" min="3" max="10" step="0.1">
+                    <div id="outerRadiusValue" class="value-display">4.80</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerCircleParticles">Nombre de particules</label>
+                    <input type="range" id="outerCircleParticles" min="100" max="2000" step="50">
+                    <div id="outerCircleParticlesValue" class="value-display">1000</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerCircleParticleSize">Taille des particules</label>
+                    <input type="range" id="outerCircleParticleSize" min="0" max="1" step="0.05">
+                    <div id="outerCircleParticleSizeValue" class="value-display">0.75</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerCircleWidth">Largeur du cercle</label>
+                    <input type="range" id="outerCircleWidth" min="0.1" max="2" step="0.1">
+                    <div id="outerCircleWidthValue" class="value-display">0.50</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerCircleDensity">Densité des particules</label>
+                    <input type="range" id="outerCircleDensity" min="0.1" max="1" step="0.05">
+                    <div id="outerCircleDensityValue" class="value-display">0.40</div>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Bordures -->
         <div class="control-section">
-            <div class="control-group">
-                <label for="innerCircleParticles">Particules des cercles intérieurs</label>
-                <input type="range" id="innerCircleParticles" min="100" max="1000" step="50" value="500">
-                <div class="value-display" id="innerCircleParticlesValue">500</div>
+            <div class="section-header">
+                <h4>Bordures</h4>
+                <button class="toggle-section" data-target="bordersContent">▼</button>
             </div>
-            <div class="control-group">
-                <label for="outerCircleParticles">Particules cercle extérieur</label>
-                <input type="range" id="outerCircleParticles" min="100" max="2000" step="50" value="1000">
-                <div class="value-display" id="outerCircleParticlesValue">1000</div>
+            <div id="bordersContent" class="section-content">
+                <div class="control-group">
+                    <label for="innerBorderWidth">Largeur bordure intérieure</label>
+                    <input type="range" id="innerBorderWidth" min="0.1" max="1" step="0.05">
+                    <div id="innerBorderWidthValue" class="value-display">0.30</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerBorderWidth">Largeur bordure extérieure</label>
+                    <input type="range" id="outerBorderWidth" min="0.1" max="1" step="0.05">
+                    <div id="outerBorderWidthValue" class="value-display">0.30</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerCircleBorderParticleSize">Taille particules bordure</label>
+                    <input type="range" id="outerCircleBorderParticleSize" min="0.1" max="1" step="0.05">
+                    <div id="outerCircleBorderParticleSizeValue" class="value-display">0.75</div>
+                </div>
+                <div class="control-group">
+                    <label for="innerBorderParticleRatio">Densité bordure intérieure</label>
+                    <input type="range" id="innerBorderParticleRatio" min="0.05" max="0.3" step="0.05">
+                    <div id="innerBorderParticleRatioValue" class="value-display">0.20</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerBorderParticleRatio">Densité bordure extérieure</label>
+                    <input type="range" id="outerBorderParticleRatio" min="0.05" max="0.3" step="0.05">
+                    <div id="outerBorderParticleRatioValue" class="value-display">0.20</div>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Particules mobiles -->
         <div class="control-section">
-            <div class="control-group">
-                <label for="innerCircleFill">Remplissage cercle intérieur</label>
-                <input type="range" id="innerCircleFill" min="0" max="1" step="0.05" value="0.9">
-                <div class="value-display" id="innerCircleFillValue">0.90</div>
+            <div class="section-header">
+                <h4>Particules mobiles</h4>
+                <button class="toggle-section" data-target="mobileParticlesContent">▼</button>
             </div>
-            <div class="control-group">
-                <label for="staticRingWidth">Largeur anneau statique extérieur</label>
-                <input type="range" id="staticRingWidth" min="0" max="1" step="0.05" value="0.5">
-                <div class="value-display" id="staticRingWidthValue">0.50</div>
-            </div>
-            <div class="control-group">
-                <label for="outerOutwardRatio">Direction particules mobiles</label>
-                <input type="range" id="outerOutwardRatio" min="0" max="1" step="0.05" value="0.6">
-                <div class="value-display" id="outerOutwardRatioValue">0.60</div>
-            </div>
-            <div class="control-group">
-                <label for="minMobileRatio">Ratio minimum particules mobiles</label>
-                <input type="range" id="minMobileRatio" min="0.1" max="0.7" step="0.05" value="0.3">
-                <div class="value-display" id="minMobileRatioValue">0.30</div>
-            </div>
-            <div class="control-group">
-                <label for="additionalCircleVerticalSpacing">Espacement vertical des cercles</label>
-                <input type="range" id="additionalCircleVerticalSpacing" min="0.2" max="2.0" step="0.1" value="0.5">
-                <div class="value-display" id="additionalCircleVerticalSpacingValue">0.50</div>
+            <div id="mobileParticlesContent" class="section-content">
+                <div class="control-group">
+                    <label for="maxParticleDistance">Distance maximale</label>
+                    <input type="range" id="maxParticleDistance" min="0.5" max="5" step="0.1">
+                    <div id="maxParticleDistanceValue" class="value-display">2.0</div>
+                </div>
+                <div class="control-group">
+                    <label for="particleSpeed">Vitesse des particules</label>
+                    <input type="range" id="particleSpeed" min="0.005" max="0.05" step="0.001">
+                    <div id="particleSpeedValue" class="value-display">0.02</div>
+                </div>
+                <div class="control-group">
+                    <label for="minMobileRatio">Ratio minimum mobile</label>
+                    <input type="range" id="minMobileRatio" min="0.1" max="0.7" step="0.05">
+                    <div id="minMobileRatioValue" class="value-display">0.3</div>
+                </div>
+                <div class="control-group">
+                    <label for="outerOutwardRatio">Ratio sortant</label>
+                    <input type="range" id="outerOutwardRatio" min="0" max="1" step="0.05">
+                    <div id="outerOutwardRatioValue" class="value-display">0.5</div>
+                </div>
+                <div class="control-group">
+                    <label for="fadeWithDistance">Fondu avec distance</label>
+                    <input type="range" id="fadeWithDistance" min="0" max="1" step="0.05">
+                    <div id="fadeWithDistanceValue" class="value-display">0.5</div>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Cercles verticaux -->
         <div class="control-section">
-            <h3>Cercles Additionnels</h3>
-            <div class="control-group">
-                <label for="whiteCircleParticles">Particules cercles blancs</label>
-                <input type="range" id="whiteCircleParticles" min="100" max="1000" step="50" value="450">
-                <div class="value-display" id="whiteCircleParticlesValue">450</div>
+            <div class="section-header">
+                <h4>Cercles verticaux</h4>
+                <button class="toggle-section" data-target="verticalCirclesContent">▼</button>
             </div>
-            <div class="control-group">
-                <label for="greenCircleParticles">Particules cercle vert</label>
-                <input type="range" id="greenCircleParticles" min="100" max="1000" step="50" value="600">
-                <div class="value-display" id="greenCircleParticlesValue">600</div>
-            </div>
-            <div class="control-group">
-                <label for="whiteCircleParticleScale">Taille particules blanches</label>
-                <input type="range" id="whiteCircleParticleScale" min="0.1" max="2.0" step="0.1" value="0.7">
-                <div class="value-display" id="whiteCircleParticleScaleValue">0.70</div>
-            </div>
-            <div class="control-group">
-                <label for="greenCircleParticleScale">Taille particules vertes</label>
-                <input type="range" id="greenCircleParticleScale" min="0.1" max="2.0" step="0.1" value="0.8">
-                <div class="value-display" id="greenCircleParticleScaleValue">0.80</div>
-            </div>
-            
-            <!-- Nouveaux contrôles pour les bordures -->
-            <div class="control-group">
-                <label for="additionalCircleBorderRatio">Densité bordures</label>
-                <input type="range" id="additionalCircleBorderRatio" min="0.1" max="0.5" step="0.05" value="0.35">
-                <div class="value-display" id="additionalCircleBorderRatioValue">0.35</div>
-            </div>
-            <div class="control-group">
-                <label for="additionalCircleBorderScale">Taille particules bordures</label>
-                <input type="range" id="additionalCircleBorderScale" min="0.1" max="1.0" step="0.05" value="0.4">
-                <div class="value-display" id="additionalCircleBorderScaleValue">0.40</div>
-            </div>
-            <div class="control-group">
-                <label for="additionalCircleBorderWidth">Largeur bordures</label>
-                <input type="range" id="additionalCircleBorderWidth" min="0.1" max="0.5" step="0.05" value="0.2">
-                <div class="value-display" id="additionalCircleBorderWidthValue">0.20</div>
+            <div id="verticalCirclesContent" class="section-content">
+                <div class="control-group">
+                    <label for="innerRadius">Rayon intérieur</label>
+                    <input type="range" id="innerRadius" min="0.5" max="4" step="0.1">
+                    <div id="innerRadiusValue" class="value-display">0.50</div>
+                </div>
+                <div class="control-group">
+                    <label for="whiteCircleParticles">Particules blanches</label>
+                    <input type="range" id="whiteCircleParticles" min="100" max="1000" step="50">
+                    <div id="whiteCircleParticlesValue" class="value-display">500</div>
+                </div>
+                <div class="control-group">
+                    <label for="greenCircleParticles">Particules vertes</label>
+                    <input type="range" id="greenCircleParticles" min="100" max="1000" step="50">
+                    <div id="greenCircleParticlesValue" class="value-display">500</div>
+                </div>
+                <div class="control-group">
+                    <label for="whiteCircleParticleScale">Échelle particules blanches</label>
+                    <input type="range" id="whiteCircleParticleScale" min="0.1" max="2.0" step="0.1">
+                    <div id="whiteCircleParticleScaleValue" class="value-display">1.0</div>
+                </div>
+                <div class="control-group">
+                    <label for="greenCircleParticleScale">Échelle particules vertes</label>
+                    <input type="range" id="greenCircleParticleScale" min="0.1" max="2.0" step="0.1">
+                    <div id="greenCircleParticleScaleValue" class="value-display">1.0</div>
+                </div>
+                <div class="control-group">
+                    <label for="additionalCircleVerticalSpacing">Espacement vertical</label>
+                    <input type="range" id="additionalCircleVerticalSpacing" min="0.2" max="2.0" step="0.1">
+                    <div id="additionalCircleVerticalSpacingValue" class="value-display">1.0</div>
+                </div>
             </div>
         </div>
-        
-        <button id="hideControls">Masquer</button>
+
+        <!-- Cercles de fin -->
+        <div class="control-section">
+            <div class="section-header">
+                <h4>Cercles de fin</h4>
+                <button class="toggle-section" data-target="endCirclesContent">▼</button>
+            </div>
+            <div id="endCirclesContent" class="section-content">
+                <div class="control-group">
+                    <label for="splitCircleSpacing">Espacement</label>
+                    <input type="range" id="splitCircleSpacing" min="0.5" max="2" step="0.1">
+                    <div id="splitCircleSpacingValue" class="value-display">1.0</div>
+                </div>
+                <div class="control-group">
+                    <label for="splitCircleRadius">Rayon</label>
+                    <input type="range" id="splitCircleRadius" min="0.1" max="0.5" step="0.05">
+                    <div id="splitCircleRadiusValue" class="value-display">0.3</div>
+                </div>
+                <div class="control-group">
+                    <label for="splitCircleFill">Remplissage</label>
+                    <input type="range" id="splitCircleFill" min="0.5" max="1" step="0.1">
+                    <div id="splitCircleFillValue" class="value-display">0.8</div>
+                </div>
+                <div class="control-group">
+                    <label for="splitParticleScale">Échelle particules</label>
+                    <input type="range" id="splitParticleScale" min="0.1" max="1" step="0.1">
+                    <div id="splitParticleScaleValue" class="value-display">0.5</div>
+                </div>
+                <div class="control-group">
+                    <label for="splitBorderParticleRatio">Ratio bordure</label>
+                    <input type="range" id="splitBorderParticleRatio" min="0.2" max="1" step="0.1">
+                    <div id="splitBorderParticleRatioValue" class="value-display">0.5</div>
+                </div>
+                <div class="control-group">
+                    <label for="splitBorderParticleScale">Échelle bordure</label>
+                    <input type="range" id="splitBorderParticleScale" min="0.1" max="1" step="0.1">
+                    <div id="splitBorderParticleScaleValue" class="value-display">0.5</div>
+                </div>
+            </div>
+        </div>
     </div>
+    <button id="hideControls">Masquer</button>
     <script type="importmap">
         {
             "imports": {

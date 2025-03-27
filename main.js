@@ -14,6 +14,8 @@ const config = {
     baseParticleSize: 0.60,    // Taille de base des particules
     outerCircleParticleSize: 0.75,     // Grosses particules pour le cercle principal
     outerCircleBorderParticleSize: 0.75, // Petites particules pour les bordures
+    outerCircleWidth: 0.5,      // Largeur du cercle extérieur principal
+    outerCircleDensity: 0.4,    // Densité des particules du cercle extérieur
     
     // Paramètres des bordures
     innerBorderWidth: 0.30,  // Largeur de la bordure intérieure
@@ -693,9 +695,10 @@ class Particle {
             this.isStatic = false;
         } else {
             // Particules statiques du cercle principal
-            this.radius = config.outerRadius;
+            const randomOffset = (Math.random() - 0.5) * config.outerCircleWidth;
+            this.radius = config.outerRadius + randomOffset;
             this.size = config.outerCircleParticleSize;
-            this.isStatic = true;
+            this.isStatic = Math.random() > config.outerCircleDensity;
         }
         
         this.angle = angle;
@@ -1058,9 +1061,6 @@ function updatePerformanceStats(currentTime) {
             memoryElement.textContent = `${memory} MB`;
         }
         
-        // Log pour le débogage
-        console.log(`Performance Stats - FPS: ${fps}, Frame Time: ${frameTime}ms, Active Particles: ${activeParticles}`);
-        
         // Réinitialiser les compteurs
         frameCount = 0;
         fpsTime = 0;
@@ -1171,8 +1171,6 @@ function animate() {
 
 // Initialiser les contrôles UI après le chargement du DOM
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM chargé, initialisation...");
-    
     // Mettre à jour la taille lors du chargement
     updateRendererSize();
     
@@ -1190,217 +1188,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialiser les contrôles
     setupControls();
     setupCameraInfoToggle();
-});
 
-// Gestion des contrôles UI
-function setupControls() {
-    const controlsPanel = document.getElementById('controls');
-    const hideControlsBtn = document.getElementById('hideControls');
-    let controlsVisible = true;
+    // Initialisation des sections
+    const sections = document.querySelectorAll('.section-content');
+    sections.forEach(section => {
+        section.style.maxHeight = section.scrollHeight + "px";
+    });
 
-    // Configuration des contrôles
-    const setupControl = (id, property, min, max, step) => {
-        const slider = document.getElementById(id);
-        const valueDisplay = document.getElementById(`${id}Value`);
+    // Gestion des sections
+    document.querySelectorAll('.section-header').forEach(header => {
+        const button = header.querySelector('.toggle-section');
+        const content = header.nextElementSibling;
         
-        if (!slider || !valueDisplay) {
-            console.error(`Contrôle non trouvé pour ${id}`);
-            return;
-        }
+        // S'assurer que les sections sont initialement visibles
+        button.classList.remove('collapsed');
+        content.classList.remove('collapsed');
         
-        // Initialiser avec la valeur actuelle
-        slider.value = config[property];
-        valueDisplay.textContent = config[property].toFixed(2);
-        
-        // Mettre à jour quand le slider change
-        slider.addEventListener('input', () => {
-            const value = parseFloat(slider.value);
-            config[property] = value;
-            valueDisplay.textContent = value.toFixed(2);
-            
-            // Liste des propriétés qui nécessitent une recréation complète des particules
-            const recreateProperties = [
-                'innerCircleParticles',
-                'outerCircleParticles',
-                'whiteCircleParticles',
-                'greenCircleParticles',
-                'whiteCircleParticleScale',
-                'greenCircleParticleScale'
-            ];
-            
-            // Liste des propriétés qui nécessitent une réinitialisation des particules
-            const resetProperties = [
-                'innerRadius',
-                'outerRadius',
-                'additionalCircleVerticalSpacing',
-                'staticRingWidth',
-                'outerOutwardRatio',
-                'innerCircleFill',
-                'outerCircleParticleSize',
-                'baseParticleSize',
-                // Ajout des propriétés de bordure
-                'additionalCircleBorderRatio',
-                'additionalCircleBorderScale',
-                'additionalCircleBorderWidth',
-                'innerBorderParticleRatio',
-                'outerBorderParticleRatio',
-                'innerBorderWidth',
-                'outerBorderWidth'
-            ];
-            
-            console.log(`Modification de ${property} à ${value}`);
-            
-            // Si la propriété nécessite une recréation complète
-            if (recreateProperties.includes(property)) {
-                console.log(`Recréation des particules pour ${property}`);
-                recreateParticles();
-            }
-            // Si la propriété nécessite une réinitialisation
-            else if (resetProperties.includes(property)) {
-                console.log(`Réinitialisation des particules pour ${property}`);
-                particles.forEach(particle => {
-                    particle.resetParticle();
-                });
-            }
-            
-            // Pour la perspective, recréer le matériau
-            if (property === 'perspectiveEffect') {
-                innerMaterial = createParticlesMaterial();
-                outerMaterial = createParticlesMaterial();
-                
-                // Mettre à jour les matériaux des objets Points
-                particlesGroup.children.forEach(points => {
-                    if (points instanceof THREE.Points) {
-                        points.material = points === innerParticlesObject ? innerMaterial : outerMaterial;
-                    }
-                });
-            }
+        header.addEventListener('click', () => {
+            button.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
         });
-    };
-
-    // Fonction pour recréer le système de particules
-    function recreateParticles() {
-        console.log("Recréation des particules avec les nouveaux paramètres...");
-        console.log("Nombre de particules vertes:", config.greenCircleParticles);
-        console.log("Nombre de particules blanches:", config.whiteCircleParticles);
-        
-        // Créer les nouvelles particules
-        particles = createParticles();
-        
-        // Séparer les particules en deux groupes
-        outerParticles = particles.filter(p => !p.isInnerCircle && !p.isAdditionalCircle);
-        innerParticles = particles.filter(p => p.isInnerCircle || p.isAdditionalCircle);
-        
-        // Supprimer les anciens groupes
-        scene.remove(particlesGroup);
-        
-        // Créer les nouvelles géométries
-        innerGeometry = new THREE.BufferGeometry();
-        outerGeometry = new THREE.BufferGeometry();
-        
-        // Initialiser les attributs pour la géométrie intérieure
-        const innerPositions = new Float32Array(innerParticles.length * 3);
-        const innerSizes = new Float32Array(innerParticles.length);
-        const innerColors = new Float32Array(innerParticles.length * 3);
-        const innerOpacities = new Float32Array(innerParticles.length);
-        
-        // Initialiser les attributs pour la géométrie extérieure
-        const outerPositions = new Float32Array(outerParticles.length * 3);
-        const outerSizes = new Float32Array(outerParticles.length);
-        const outerColors = new Float32Array(outerParticles.length * 3);
-        const outerOpacities = new Float32Array(outerParticles.length);
-        
-        // Configurer les attributs des géométries
-        innerGeometry.setAttribute('position', new THREE.BufferAttribute(innerPositions, 3));
-        innerGeometry.setAttribute('size', new THREE.BufferAttribute(innerSizes, 1));
-        innerGeometry.setAttribute('color', new THREE.BufferAttribute(innerColors, 3));
-        innerGeometry.setAttribute('opacity', new THREE.BufferAttribute(innerOpacities, 1));
-        
-        outerGeometry.setAttribute('position', new THREE.BufferAttribute(outerPositions, 3));
-        outerGeometry.setAttribute('size', new THREE.BufferAttribute(outerSizes, 1));
-        outerGeometry.setAttribute('color', new THREE.BufferAttribute(outerColors, 3));
-        outerGeometry.setAttribute('opacity', new THREE.BufferAttribute(outerOpacities, 1));
-        
-        // Créer les matériaux
-        innerMaterial = createParticlesMaterial(false); // Avec transparence pour les cercles intérieurs
-        outerMaterial = createParticlesMaterial(true);  // Sans transparence pour le cercle extérieur
-        
-        // Créer les objets Points
-        const innerParticlesObject = new THREE.Points(innerGeometry, innerMaterial);
-        const outerParticlesObject = new THREE.Points(outerGeometry, outerMaterial);
-        
-        // Créer le groupe pour le cercle extérieur
-        outerCircleGroup = new THREE.Group();
-        outerCircleGroup.add(outerParticlesObject);
-        
-        // Créer le groupe principal
-        particlesGroup = new THREE.Group();
-        particlesGroup.add(outerCircleGroup);
-        particlesGroup.add(innerParticlesObject);
-        
-        // Initialiser la rotation
-        particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
-        scene.add(particlesGroup);
-        
-        // Forcer une mise à jour des attributs
-        innerGeometry.attributes.position.needsUpdate = true;
-        innerGeometry.attributes.size.needsUpdate = true;
-        innerGeometry.attributes.color.needsUpdate = true;
-        innerGeometry.attributes.opacity.needsUpdate = true;
-        
-        outerGeometry.attributes.position.needsUpdate = true;
-        outerGeometry.attributes.size.needsUpdate = true;
-        outerGeometry.attributes.color.needsUpdate = true;
-        outerGeometry.attributes.opacity.needsUpdate = true;
-    }
+    });
 
     // Gestion du bouton pour masquer/afficher les contrôles
-    if (hideControlsBtn) {
-        hideControlsBtn.addEventListener('click', () => {
-            if (controlsVisible) {
-                controlsPanel.style.right = '-270px';
-                hideControlsBtn.textContent = 'Afficher';
-            } else {
-                controlsPanel.style.right = '10px';
-                hideControlsBtn.textContent = 'Masquer';
-            }
-            controlsVisible = !controlsVisible;
-        });
-    }
-    
-    // Configuration des contrôles spécifiques
-    setupControl('innerRadius', 'innerRadius', 0.5, 4, 0.1);
-    setupControl('outerRadius', 'outerRadius', 3, 10, 0.1);
-    setupControl('innerCircleParticles', 'innerCircleParticles', 100, 1000, 50);
-    setupControl('outerCircleParticles', 'outerCircleParticles', 100, 2000, 50);
-    setupControl('baseParticleSize', 'baseParticleSize', 0.1, 1, 0.05);
-    setupControl('outerCircleParticleSize', 'outerCircleParticleSize', 0, 1, 0.05);
-    setupControl('outerCircleBorderParticleSize', 'outerCircleBorderParticleSize', 0.1, 1, 0.05);
-    setupControl('innerBorderWidth', 'innerBorderWidth', 0.1, 1, 0.05);
-    setupControl('outerBorderWidth', 'outerBorderWidth', 0.1, 1, 0.05);
-    setupControl('innerBorderParticleRatio', 'innerBorderParticleRatio', 0.05, 0.3, 0.05);
-    setupControl('outerBorderParticleRatio', 'outerBorderParticleRatio', 0.05, 0.3, 0.05);
-    setupControl('maxParticleDistance', 'maxParticleDistance', 0.5, 5, 0.1);
-    setupControl('particleSpeed', 'particleSpeed', 0.005, 0.05, 0.001);
-    setupControl('fadeWithDistance', 'fadeWithDistance', 0, 1, 0.05);
-    setupControl('innerCircleFill', 'innerCircleFill', 0, 1, 0.05);
-    setupControl('staticRingWidth', 'staticRingWidth', 0, 1, 0.05);
-    setupControl('outerOutwardRatio', 'outerOutwardRatio', 0, 1, 0.05);
-    setupControl('perspectiveEffect', 'perspectiveEffect', 0, 1, 0.05);
-    setupControl('minMobileRatio', 'minMobileRatio', 0.1, 0.7, 0.05);
-    setupControl('additionalCircleVerticalSpacing', 'additionalCircleVerticalSpacing', 0.2, 1.5, 0.1);
-    
-    // Contrôles pour les cercles additionnels
-    setupControl('whiteCircleParticles', 'whiteCircleParticles', 100, 1000, 50);
-    setupControl('greenCircleParticles', 'greenCircleParticles', 100, 1000, 50);
-    setupControl('whiteCircleParticleScale', 'whiteCircleParticleScale', 0.1, 2.0, 0.1);
-    setupControl('greenCircleParticleScale', 'greenCircleParticleScale', 0.1, 2.0, 0.1);
-    
-    // Nouveaux contrôles pour les bordures des cercles additionnels
-    setupControl('additionalCircleBorderRatio', 'additionalCircleBorderRatio', 0.1, 0.5, 0.05);
-    setupControl('additionalCircleBorderScale', 'additionalCircleBorderScale', 0.1, 1.0, 0.05);
-    setupControl('additionalCircleBorderWidth', 'additionalCircleBorderWidth', 0.1, 0.5, 0.05);
-}
+    const hideButton = document.getElementById('hideControls');
+    const controls = document.getElementById('controls');
+    let isHidden = false;
+
+    hideButton.addEventListener('click', () => {
+        isHidden = !isHidden;
+        controls.style.transform = isHidden ? 'translateX(-100%)' : 'translateX(0)';
+        hideButton.textContent = isHidden ? 'Show' : 'Hide';
+    });
+});
 
 // Gestion du bouton pour afficher/masquer les indicateurs de caméra
 function setupCameraInfoToggle() {
@@ -1431,3 +1251,217 @@ function setupCameraInfoToggle() {
         });
     }
 }
+
+function setupControls() {
+    // Gestion des sections
+    document.querySelectorAll('.section-header').forEach(header => {
+        const button = header.querySelector('.toggle-section');
+        const content = header.nextElementSibling;
+        
+        // S'assurer que les sections sont initialement visibles
+        button.classList.remove('collapsed');
+        content.classList.remove('collapsed');
+        
+        header.addEventListener('click', () => {
+            button.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+        });
+    });
+
+    // Gestion du bouton pour masquer/afficher les contrôles
+    const hideButton = document.getElementById('hideControls');
+    const controls = document.getElementById('controls');
+    let isHidden = false;
+
+    hideButton.addEventListener('click', () => {
+        isHidden = !isHidden;
+        controls.style.transform = isHidden ? 'translateX(-100%)' : 'translateX(0)';
+        hideButton.textContent = isHidden ? 'Show' : 'Hide';
+    });
+
+    // Gestion de la visibilité des éléments
+    const showOuterCircle = document.getElementById('showOuterCircle');
+    const showBorders = document.getElementById('showBorders');
+    const showMobileParticles = document.getElementById('showMobileParticles');
+
+    if (showOuterCircle && showBorders && showMobileParticles) {
+        const updateVisibility = () => {
+            particles.forEach(particle => {
+                // Réinitialiser l'état actif
+                particle.active = true;
+
+                // Gérer la visibilité du cercle extérieur (seulement les particules statiques)
+                if (!showOuterCircle.checked && !particle.isInnerCircle && !particle.isAdditionalCircle && particle.isStatic) {
+                    particle.active = false;
+                }
+
+                // Gérer la visibilité des bordures
+                if (!showBorders.checked && particle.isBorder) {
+                    particle.active = false;
+                }
+
+                // Gérer la visibilité des particules mobiles (uniquement celles qui ne sont pas statiques)
+                if (!showMobileParticles.checked && !particle.isStatic) {
+                    particle.active = false;
+                }
+            });
+        };
+
+        // Appliquer la visibilité initiale
+        updateVisibility();
+
+        // Ajouter les écouteurs d'événements
+        showOuterCircle.addEventListener('change', updateVisibility);
+        showBorders.addEventListener('change', updateVisibility);
+        showMobileParticles.addEventListener('change', updateVisibility);
+    }
+
+    // Configuration des contrôles spécifiques
+    // Cercle extérieur
+    const outerRadiusControl = document.getElementById('outerRadius');
+    const outerCircleParticlesControl = document.getElementById('outerCircleParticles');
+    const outerCircleParticleSizeControl = document.getElementById('outerCircleParticleSize');
+    const outerCircleWidthControl = document.getElementById('outerCircleWidth');
+    const outerCircleDensityControl = document.getElementById('outerCircleDensity');
+
+    // Bordures
+    const innerBorderWidthControl = document.getElementById('innerBorderWidth');
+    const outerBorderWidthControl = document.getElementById('outerBorderWidth');
+    const outerCircleBorderParticleSizeControl = document.getElementById('outerCircleBorderParticleSize');
+    const innerBorderParticleRatioControl = document.getElementById('innerBorderParticleRatio');
+    const outerBorderParticleRatioControl = document.getElementById('outerBorderParticleRatio');
+
+    // Particules mobiles
+    const maxParticleDistanceControl = document.getElementById('maxParticleDistance');
+    const particleSpeedControl = document.getElementById('particleSpeed');
+    const minMobileRatioControl = document.getElementById('minMobileRatio');
+    const outerOutwardRatioControl = document.getElementById('outerOutwardRatio');
+    const fadeWithDistanceControl = document.getElementById('fadeWithDistance');
+
+    // Cercles verticaux
+    const innerRadiusControl = document.getElementById('innerRadius');
+    const whiteCircleParticlesControl = document.getElementById('whiteCircleParticles');
+    const greenCircleParticlesControl = document.getElementById('greenCircleParticles');
+    const whiteCircleParticleScaleControl = document.getElementById('whiteCircleParticleScale');
+    const greenCircleParticleScaleControl = document.getElementById('greenCircleParticleScale');
+    const additionalCircleVerticalSpacingControl = document.getElementById('additionalCircleVerticalSpacing');
+
+    // Cercles de fin
+    const splitCircleSpacingControl = document.getElementById('splitCircleSpacing');
+    const splitCircleRadiusControl = document.getElementById('splitCircleRadius');
+    const splitCircleFillControl = document.getElementById('splitCircleFill');
+    const splitParticleScaleControl = document.getElementById('splitParticleScale');
+    const splitBorderParticleRatioControl = document.getElementById('splitBorderParticleRatio');
+    const splitBorderParticleScaleControl = document.getElementById('splitBorderParticleScale');
+
+    // Cercle extérieur
+    outerRadiusControl.value = config.outerRadius.toFixed(2);
+    outerCircleParticlesControl.value = config.outerCircleParticles.toString();
+    outerCircleParticleSizeControl.value = config.outerCircleParticleSize.toFixed(2);
+    outerCircleWidthControl.value = config.outerCircleWidth.toFixed(2);
+    outerCircleDensityControl.value = config.outerCircleDensity.toFixed(2);
+
+    // Bordures
+    innerBorderWidthControl.value = config.innerBorderWidth.toFixed(2);
+    outerBorderWidthControl.value = config.outerBorderWidth.toFixed(2);
+    outerCircleBorderParticleSizeControl.value = config.outerCircleBorderParticleSize.toFixed(2);
+    innerBorderParticleRatioControl.value = config.innerBorderParticleRatio.toFixed(2);
+    outerBorderParticleRatioControl.value = config.outerBorderParticleRatio.toFixed(2);
+
+    // Particules mobiles
+    maxParticleDistanceControl.value = config.maxParticleDistance.toFixed(2);
+    particleSpeedControl.value = config.particleSpeed.toFixed(2);
+    minMobileRatioControl.value = config.minMobileRatio.toFixed(2);
+    outerOutwardRatioControl.value = config.outerOutwardRatio.toFixed(2);
+    fadeWithDistanceControl.value = config.fadeWithDistance.toFixed(2);
+
+    // Cercles verticaux
+    innerRadiusControl.value = config.innerRadius.toFixed(2);
+    whiteCircleParticlesControl.value = config.whiteCircleParticles.toString();
+    greenCircleParticlesControl.value = config.greenCircleParticles.toString();
+    whiteCircleParticleScaleControl.value = config.whiteCircleParticleScale.toFixed(2);
+    greenCircleParticleScaleControl.value = config.greenCircleParticleScale.toFixed(2);
+    additionalCircleVerticalSpacingControl.value = config.additionalCircleVerticalSpacing.toFixed(2);
+
+    // Cercles de fin
+    splitCircleSpacingControl.value = config.splitAnimation.spacing.toFixed(2);
+    splitCircleRadiusControl.value = config.splitAnimation.circleRadius.toFixed(2);
+    splitCircleFillControl.value = config.splitAnimation.circleFill.toFixed(2);
+    splitParticleScaleControl.value = config.splitAnimation.particleScale.toFixed(2);
+    splitBorderParticleRatioControl.value = config.splitAnimation.borderParticleRatio.toFixed(2);
+    splitBorderParticleScaleControl.value = config.splitAnimation.borderParticleScale.toFixed(2);
+
+    // Mettre à jour les contrôles
+    function updateControl(control, property) {
+        const value = parseFloat(control.value);
+        config[property] = value;
+        
+        // Liste des propriétés qui nécessitent une recréation complète des particules
+        const recreateProperties = [
+            'outerCircleParticles',
+            'whiteCircleParticles',
+            'greenCircleParticles'
+        ];
+        
+        // Liste des propriétés qui nécessitent une réinitialisation des particules
+        const resetProperties = [
+            'innerRadius',
+            'outerRadius',
+            'additionalCircleVerticalSpacing',
+            'outerCircleParticleSize',
+            'outerCircleBorderParticleSize',
+            'innerBorderWidth',
+            'outerBorderWidth',
+            'outerCircleWidth',
+            'outerCircleDensity',
+            'innerBorderParticleRatio',
+            'outerBorderParticleRatio'
+        ];
+        
+        // Si la propriété nécessite une recréation complète
+        if (recreateProperties.includes(property)) {
+            recreateParticles();
+        }
+        // Si la propriété nécessite une réinitialisation
+        else if (resetProperties.includes(property)) {
+            particles.forEach(particle => {
+                particle.resetParticle();
+            });
+        }
+    }
+
+    outerRadiusControl.addEventListener('input', () => updateControl(outerRadiusControl, 'outerRadius'));
+    outerCircleParticlesControl.addEventListener('input', () => updateControl(outerCircleParticlesControl, 'outerCircleParticles'));
+    outerCircleParticleSizeControl.addEventListener('input', () => updateControl(outerCircleParticleSizeControl, 'outerCircleParticleSize'));
+    outerCircleWidthControl.addEventListener('input', () => updateControl(outerCircleWidthControl, 'outerCircleWidth'));
+    outerCircleDensityControl.addEventListener('input', () => updateControl(outerCircleDensityControl, 'outerCircleDensity'));
+
+    innerBorderWidthControl.addEventListener('input', () => updateControl(innerBorderWidthControl, 'innerBorderWidth'));
+    outerBorderWidthControl.addEventListener('input', () => updateControl(outerBorderWidthControl, 'outerBorderWidth'));
+    outerCircleBorderParticleSizeControl.addEventListener('input', () => updateControl(outerCircleBorderParticleSizeControl, 'outerCircleBorderParticleSize'));
+    innerBorderParticleRatioControl.addEventListener('input', () => updateControl(innerBorderParticleRatioControl, 'innerBorderParticleRatio'));
+    outerBorderParticleRatioControl.addEventListener('input', () => updateControl(outerBorderParticleRatioControl, 'outerBorderParticleRatio'));
+
+    maxParticleDistanceControl.addEventListener('input', () => updateControl(maxParticleDistanceControl, 'maxParticleDistance'));
+    particleSpeedControl.addEventListener('input', () => updateControl(particleSpeedControl, 'particleSpeed'));
+    minMobileRatioControl.addEventListener('input', () => updateControl(minMobileRatioControl, 'minMobileRatio'));
+    outerOutwardRatioControl.addEventListener('input', () => updateControl(outerOutwardRatioControl, 'outerOutwardRatio'));
+    fadeWithDistanceControl.addEventListener('input', () => updateControl(fadeWithDistanceControl, 'fadeWithDistance'));
+
+    innerRadiusControl.addEventListener('input', () => updateControl(innerRadiusControl, 'innerRadius'));
+    whiteCircleParticlesControl.addEventListener('input', () => updateControl(whiteCircleParticlesControl, 'whiteCircleParticles'));
+    greenCircleParticlesControl.addEventListener('input', () => updateControl(greenCircleParticlesControl, 'greenCircleParticles'));
+    whiteCircleParticleScaleControl.addEventListener('input', () => updateControl(whiteCircleParticleScaleControl, 'whiteCircleParticleScale'));
+    greenCircleParticleScaleControl.addEventListener('input', () => updateControl(greenCircleParticleScaleControl, 'greenCircleParticleScale'));
+    additionalCircleVerticalSpacingControl.addEventListener('input', () => updateControl(additionalCircleVerticalSpacingControl, 'additionalCircleVerticalSpacing'));
+
+    splitCircleSpacingControl.addEventListener('input', () => updateControl(splitCircleSpacingControl, 'splitAnimation.spacing'));
+    splitCircleRadiusControl.addEventListener('input', () => updateControl(splitCircleRadiusControl, 'splitAnimation.circleRadius'));
+    splitCircleFillControl.addEventListener('input', () => updateControl(splitCircleFillControl, 'splitAnimation.circleFill'));
+    splitParticleScaleControl.addEventListener('input', () => updateControl(splitParticleScaleControl, 'splitAnimation.particleScale'));
+    splitBorderParticleRatioControl.addEventListener('input', () => updateControl(splitBorderParticleRatioControl, 'splitAnimation.borderParticleRatio'));
+    splitBorderParticleScaleControl.addEventListener('input', () => updateControl(splitBorderParticleScaleControl, 'splitAnimation.borderParticleScale'));
+}
+
+// Appeler setupControls après l'initialisation de Three.js
+setupControls();

@@ -312,6 +312,9 @@ function updateCameraFromScroll() {
     // Suivre les cercles uniques traités
     const processedIndices = new Set();
     
+    // Calculer le temps pour l'effet de flottement
+    const time = Date.now() * 0.001;
+    
     // Mettre à jour l'espacement et la couleur des cercles
     innerParticles.forEach(particle => {
         if (particle.isInnerCircle) {
@@ -332,17 +335,35 @@ function updateCameraFromScroll() {
                 const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
                 particle.color = currentColorSpacing;
                 particle.opacity = 1.0;
-            }
-            
-            // Mettre à jour la position Y avec un espacement uniforme
-            if (particle.additionalCircleIndex === 1) {
+
+                // Calculer l'effet de flottement pour les cercles blancs
+                const verticalSpeed = 0.4 + (particle.additionalCircleIndex * 0.1);
+                const horizontalSpeed = 0.2 + (particle.additionalCircleIndex * 0.1);
+                const verticalAmplitude = 0.1;
+                const horizontalAmplitude = 0.05;
+                const individualOffset = particle.index * 0.5;
+
+                const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
+                const horizontalOffsetX = Math.cos(time * horizontalSpeed + individualOffset) * horizontalAmplitude;
+                const horizontalOffsetZ = Math.sin(time * horizontalSpeed + individualOffset * 1.3) * horizontalAmplitude;
+
+                // Mettre à jour la position Y avec un espacement uniforme
+                let baseY;
+                if (particle.additionalCircleIndex === 0) {
+                    baseY = currentSpacing;
+                } else if (particle.additionalCircleIndex === 2) {
+                    baseY = -currentSpacing;
+                } else if (particle.additionalCircleIndex === 3) {
+                    baseY = -2 * currentSpacing;
+                }
+
+                // Appliquer les offsets de flottement
+                particle.x = particle.originalX + horizontalOffsetX;
+                particle.y = baseY + verticalOffset;
+                particle.z = particle.originalZ + horizontalOffsetZ;
+            } else {
+                // Pour le cercle vert (index 1)
                 particle.y = 0;
-            } else if (particle.additionalCircleIndex === 0) {
-                particle.y = currentSpacing;
-            } else if (particle.additionalCircleIndex === 2) {
-                particle.y = -currentSpacing;
-            } else if (particle.additionalCircleIndex === 3) {
-                particle.y = -2 * currentSpacing;
             }
         }
     });
@@ -397,13 +418,15 @@ function updateSplitAnimation(progress) {
     
     // Traiter chaque particule
     centralParticles.forEach((particle, index) => {
-        // S'assurer que la particule reste active et visible
+        // S'assurer que la particule reste active
         particle.active = true;
         particle.opacity = 1.0;
         
         // Gérer la taille des particules supplémentaires
         if (particle.isExtraGreenParticle) {
             particle.currentSize = particle.size * progress;
+        } else {
+            particle.currentSize = particle.size;
         }
         
         // Sauvegarder la position d'origine si ce n'est pas déjà fait
@@ -449,7 +472,8 @@ function updateSplitAnimation(progress) {
             
             particle.splitTarget = {
                 x: centerX + Math.cos(angleInSubCircle) * finalRadius,
-                z: centerZ + Math.sin(angleInSubCircle) * finalRadius
+                z: centerZ + Math.sin(angleInSubCircle) * finalRadius,
+                y: particle.y // Conserver la position Y d'origine
             };
         }
         
@@ -458,9 +482,29 @@ function updateSplitAnimation(progress) {
             ? 4 * progress * progress * progress
             : 1 - Math.pow(-2 * progress + 2, 3) / 2;
         
+        // Calculer l'effet de flottement
+        const time = Date.now() * 0.001;
+        const individualOffset = index * 0.5;
+        const verticalSpeed = 0.8;
+        const horizontalSpeed = 0.4;
+        const verticalAmplitude = 0.15;
+        const horizontalAmplitude = 0.1;
+        
+        // Calculer les offsets de flottement avec une courbe plus prononcée
+        const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
+        const horizontalOffsetX = Math.cos(time * horizontalSpeed + individualOffset) * horizontalAmplitude;
+        const horizontalOffsetZ = Math.sin(time * horizontalSpeed + individualOffset * 1.3) * horizontalAmplitude;
+
         // Interpoler entre la position de départ et la position cible
-        particle.x = particle.splitStartPosition.x * (1 - easeProgress) + particle.splitTarget.x * easeProgress;
-        particle.z = particle.splitStartPosition.z * (1 - easeProgress) + particle.splitTarget.z * easeProgress;
+        const baseX = particle.splitStartPosition.x * (1 - easeProgress) + particle.splitTarget.x * easeProgress;
+        const baseZ = particle.splitStartPosition.z * (1 - easeProgress) + particle.splitTarget.z * easeProgress;
+
+        // Appliquer le flottement progressivement avec l'animation
+        // Utiliser une courbe plus prononcée pour le progrès du flottement
+        const floatProgress = Math.pow(progress, 0.7); // Rend le flottement plus visible plus tôt
+        particle.x = baseX + horizontalOffsetX * floatProgress;
+        particle.y = particle.splitStartPosition.y + verticalOffset * floatProgress;
+        particle.z = baseZ + horizontalOffsetZ * floatProgress;
         
         // Marquer la particule comme étant en cours de division
         particle.hasBeenSplit = true;
@@ -1024,6 +1068,9 @@ function animate() {
     
     let movingCount = 0;
     
+    // Calculer le temps pour l'effet de flottement
+    const time = Date.now() * 0.001;
+    
     // Mettre à jour les particules intérieures
     innerParticles.forEach((particle, i) => {
         if (!particle.active) return;
@@ -1031,11 +1078,29 @@ function animate() {
         if (!particle.isStatic) {
             particle.update(0.016);
         }
-        
+
         const idx = i * 3;
-        innerGeometry.attributes.position.array[idx] = particle.x;
-        innerGeometry.attributes.position.array[idx + 1] = particle.y;
-        innerGeometry.attributes.position.array[idx + 2] = particle.z;
+
+        // Appliquer un léger flottement vertical pour les cercles blancs
+        if (particle.isAdditionalCircle && particle.additionalCircleIndex !== 1) {
+            // S'assurer que chaque particule a une phase initiale
+            if (particle.floatPhase === undefined) {
+                particle.floatPhase = Math.random() * Math.PI * 2;
+            }
+            
+            // Créer un mouvement vertical très léger et unique pour chaque particule
+            const verticalOffset = Math.sin(time * 0.5 + particle.floatPhase) * 0.03;
+
+            // Appliquer uniquement l'offset vertical
+            innerGeometry.attributes.position.array[idx] = particle.x;
+            innerGeometry.attributes.position.array[idx + 1] = particle.y + verticalOffset;
+            innerGeometry.attributes.position.array[idx + 2] = particle.z;
+        } else {
+            // Pour les autres particules, utiliser leur position normale
+            innerGeometry.attributes.position.array[idx] = particle.x;
+            innerGeometry.attributes.position.array[idx + 1] = particle.y;
+            innerGeometry.attributes.position.array[idx + 2] = particle.z;
+        }
         
         innerGeometry.attributes.size.array[i] = particle.currentSize;
         
@@ -1065,7 +1130,6 @@ function animate() {
         
         outerGeometry.attributes.size.array[i] = particle.currentSize;
         
-        // Appliquer l'opacité individuelle de la particule
         outerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     

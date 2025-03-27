@@ -261,10 +261,10 @@ function updateCameraFromScroll() {
     const outerCircleEndFade = 40;
     const verticalSpacingStart = 20;
     const verticalSpacingEnd = 60;
-    const innerColorStart = 49;
+    const innerColorStart = 35;
     const innerColorEnd = 56;
-    const splitStart = 80;
-    const splitEnd = 100;
+    const splitStart = 65;
+    const splitEnd = 95;
     
     // Calculer les progressions pour chaque animation
     const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));

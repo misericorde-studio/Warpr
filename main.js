@@ -575,6 +575,11 @@ class Particle {
             // Réinitialiser en tant que particule du cercle extérieur
             this.resetOuterParticle();
         }
+        
+        // Ne pas réinitialiser la taille si c'est une particule supplémentaire
+        if (!this.isExtraGreenParticle) {
+            this.currentSize = this.size;
+        }
     }
     
     // Méthode pour réinitialiser spécifiquement une particule du cercle extérieur
@@ -831,14 +836,23 @@ function createParticles() {
             particle.additionalCircleIndex = circleIndex;
             particle.isStatic = true;
             particle.particleScale = particleScale;
+            
             // Marquer les particules supplémentaires du cercle vert
             if (circleIndex === 1 && i >= config.greenCircleParticles) {
                 particle.isExtraGreenParticle = true;
                 particle.size = config.baseParticleSize * particleScale;
-                particle.currentSize = 0; // Commencer avec une taille de 0
-                particle.opacity = 1; // Garder une opacité constante
+                particle.currentSize = 0; // Taille initiale à 0
+                particle.opacity = 1;
             }
+            
+            // Important : resetParticle() après avoir défini toutes les propriétés
             particle.resetParticle();
+            
+            // S'assurer que la taille reste à 0 pour les particules supplémentaires après le reset
+            if (particle.isExtraGreenParticle) {
+                particle.currentSize = 0;
+            }
+            
             particles.push(particle);
         }
     }

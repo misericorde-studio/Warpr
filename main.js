@@ -295,14 +295,14 @@ function updateCameraFromScroll() {
         opacities.needsUpdate = true;
     }
     
-    // Calculer la progression pour la section 3
-    const section3Progress = Math.min(Math.max(0, 1 - (thirdSectionRect.top / viewportHeight)), 1);
+    // Calculer la progression pour la section 3 avec un décalage pour commencer plus tôt
+    const section3Progress = Math.min(Math.max(0, 1.25 - (thirdSectionRect.top / viewportHeight)), 1);
     
     // Calculer une progression d'opacité plus rapide (disparition plus tôt)
     const opacityProgress = Math.min(1, section3Progress * 1.5);
     
     // Transition de l'espacement vertical des cercles
-    const startSpacing = 0.5;
+    const startSpacing = 0.15;  // Réduit de 0.5 à 0.15 pour un espacement initial plus serré
     const endSpacing = 2.5;
     const currentSpacing = startSpacing + (endSpacing - startSpacing) * section3Progress;
     

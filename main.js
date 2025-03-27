@@ -45,6 +45,7 @@ const config = {
     additionalCircles: 4,      // 3 blancs + 1 vert (le cercle intérieur compte comme un blanc)
     whiteCircleParticles: 100, // Nombre de particules pour les cercles blancs
     greenCircleParticles: 100, // Nombre de particules pour le cercle vert
+    greenCircleExtraParticles: 100, // Nouvelles particules pour l'animation de division
     whiteCircleParticleScale: 0.8, // Facteur d'échelle pour les particules des cercles blancs
     greenCircleParticleScale: 0.9, // Facteur d'échelle pour les particules du cercle vert
     additionalCircleVerticalSpacing: 0.15, // Espacement vertical initial entre les cercles
@@ -276,28 +277,28 @@ function updateCameraFromScroll() {
     const startColor = new THREE.Color(0xffffff);
     const endColor = new THREE.Color(0x0C0E13);
     const smoothProgress = Math.pow(outerCircleProgress, 0.5);
-    const currentColor = startColor.clone().lerp(endColor, smoothProgress);
-    
-    let opacity = 1.0;
-    if (smoothProgress > 0.95) {
-        opacity = 1.0 - ((smoothProgress - 0.95) * 20);
-    }
-    
-    const colors = outerGeometry.attributes.color;
-    const opacities = outerGeometry.attributes.opacity;
-    
-    for (let i = 0; i < colors.count; i++) {
-        colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
-        opacities.setX(i, opacity);
+        const currentColor = startColor.clone().lerp(endColor, smoothProgress);
         
-        if (outerParticles[i]) {
-            outerParticles[i].color = currentColor;
-            outerParticles[i].opacity = opacity;
+        let opacity = 1.0;
+        if (smoothProgress > 0.95) {
+        opacity = 1.0 - ((smoothProgress - 0.95) * 20);
         }
-    }
-    
-    colors.needsUpdate = true;
-    opacities.needsUpdate = true;
+        
+        const colors = outerGeometry.attributes.color;
+        const opacities = outerGeometry.attributes.opacity;
+        
+        for (let i = 0; i < colors.count; i++) {
+            colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
+            opacities.setX(i, opacity);
+            
+            if (outerParticles[i]) {
+                outerParticles[i].color = currentColor;
+                outerParticles[i].opacity = opacity;
+            }
+        }
+        
+        colors.needsUpdate = true;
+        opacities.needsUpdate = true;
 
     // Animation de l'espacement vertical et de la couleur des cercles intérieurs
     const startSpacing = config.additionalCircleVerticalSpacing;
@@ -365,7 +366,7 @@ function updateCameraFromScroll() {
     // Animation de division
     if (splitProgress > 0) {
         config.splitAnimation.active = true;
-        config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
+        config.splitAnimation.currentSizeMultiplier = 1.0;
         config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
         updateSplitAnimation(splitProgress);
     } else {
@@ -389,52 +390,21 @@ function updateSplitAnimation(progress) {
         return;
     }
     
-    // Si l'animation est désactivée et progress est 0, restaurer les positions d'origine
-    if (!config.splitAnimation.active && progress === 0) {
-        centralParticles.forEach(particle => {
-            if (particle.hasBeenSplit) {
-                // Restaurer la position d'origine
-                particle.x = particle.originalX;
-                particle.y = particle.originalY;
-                particle.z = particle.originalZ;
-                
-                // Restaurer les propriétés
-                particle.isAdditionalCircle = true; // Toujours garder cette valeur à true
-                particle.hasBeenSplit = false;
-                particle.isStatic = true;
-                particle.floatSpeed = 0.01 + Math.random() * 0.02;
-                particle.floatPhase = Math.random() * Math.PI * 2;
-                particle.isBorder = false; // Réinitialiser l'état de bordure
-                
-                // La taille est maintenant gérée par le multiplicateur global
-                
-                // Effacer les données d'animation mais maintenir l'activation
-                particle.splitStartPosition = null;
-                particle.splitTarget = null;
-                particle.active = true;
-            }
-        });
-        return;
-    }
-    
     // Calculer combien de particules par sous-cercle
     const gridSize = config.splitAnimation.gridSize;
-    const totalSubCircles = gridSize * gridSize; // 9 sous-cercles
+    const totalSubCircles = gridSize * gridSize;
     const particlesPerSubCircle = Math.ceil(centralParticles.length / totalSubCircles);
     
     // Traiter chaque particule
     centralParticles.forEach((particle, index) => {
         // S'assurer que la particule reste active et visible
         particle.active = true;
-        particle.isAdditionalCircle = true; // Toujours garder cette valeur à true
+        particle.opacity = 1.0;
         
-        // Marquer comme en cours de division
-        particle.hasBeenSplit = true;
-        
-        // Déterminer à quel sous-cercle cette particule appartient
-        const subCircleIndex = Math.floor(index / particlesPerSubCircle);
-        const row = Math.floor(subCircleIndex / gridSize);
-        const col = subCircleIndex % gridSize;
+        // Gérer la taille des particules supplémentaires
+        if (particle.isExtraGreenParticle) {
+            particle.currentSize = particle.size * progress;
+        }
         
         // Sauvegarder la position d'origine si ce n'est pas déjà fait
         if (!particle.originalX) {
@@ -454,61 +424,46 @@ function updateSplitAnimation(progress) {
         
         // Calculer la position cible si nécessaire
         if (!particle.splitTarget) {
-            // Position du centre du sous-cercle dans la grille 3x3
+            const subCircleIndex = Math.floor(index / particlesPerSubCircle);
+            const row = Math.floor(subCircleIndex / gridSize);
+            const col = subCircleIndex % gridSize;
+            
             const centerX = (col - (gridSize - 1) / 2) * config.splitAnimation.spacing;
             const centerZ = (row - (gridSize - 1) / 2) * config.splitAnimation.spacing;
             
             // Déterminer si c'est une particule de bordure
             particle.isBorder = Math.random() < config.splitAnimation.borderParticleRatio;
             
-            // Position dans le sous-cercle (distribution circulaire remplie)
+            // Position dans le sous-cercle
             const particleIndexInSubCircle = index % particlesPerSubCircle;
             const angleInSubCircle = (particleIndexInSubCircle / particlesPerSubCircle) * Math.PI * 2;
             
-            // Distribution radiale en fonction du type de particule (bordure ou non)
+            // Distribution radiale
             let radiusFactor;
             if (particle.isBorder) {
-                // Pour les particules de bordure, les placer près du bord du cercle
-                radiusFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2 pour créer une bordure épaisse
+                radiusFactor = 0.8 + Math.random() * 0.4;
             } else {
-                // Pour les particules normales, utiliser la distribution habituelle
                 radiusFactor = Math.pow(Math.random(), 0.5) * config.splitAnimation.circleFill;
             }
             const finalRadius = config.splitAnimation.circleRadius * radiusFactor;
             
-            // Calculer la position finale avec une forme de cercle rempli
             particle.splitTarget = {
                 x: centerX + Math.cos(angleInSubCircle) * finalRadius,
                 z: centerZ + Math.sin(angleInSubCircle) * finalRadius
             };
-            
-            // Ajuster la taille en fonction du type de particule
-            if (particle.isBorder) {
-                particle.size *= config.splitAnimation.borderParticleScale;
-            }
         }
         
         // Appliquer une courbe d'accélération pour une animation plus naturelle
         const easeProgress = progress < 0.5 
-            ? 4 * progress * progress * progress  // Accélération plus forte au début
-            : 1 - Math.pow(-2 * progress + 2, 3) / 2; // Décélération plus douce à la fin
+            ? 4 * progress * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
         
         // Interpoler entre la position de départ et la position cible
         particle.x = particle.splitStartPosition.x * (1 - easeProgress) + particle.splitTarget.x * easeProgress;
         particle.z = particle.splitStartPosition.z * (1 - easeProgress) + particle.splitTarget.z * easeProgress;
         
-        // La taille est maintenant gérée par le multiplicateur global dans la fonction animate
-        
-        // Ajuster progressivement les propriétés statiques
-        if (progress > 0.95) {
-            // Si l'animation est presque terminée, finaliser l'état
-            particle.isStatic = true;
-            particle.floatSpeed = particle.isBorder ? 0.02 + Math.random() * 0.03 : 0.01 + Math.random() * 0.02;
-            particle.floatPhase = Math.random() * Math.PI * 2;
-        } else {
-            // Pendant l'animation, maintenir l'état adéquat
-            particle.isStatic = false; // Non statique pendant l'animation pour permettre un mouvement fluide
-        }
+        // Marquer la particule comme étant en cours de division
+        particle.hasBeenSplit = true;
     });
 }
 
@@ -669,12 +624,12 @@ class Particle {
         
         this.distanceTraveled = 0;
         this.active = true;
-        this.currentSize = this.size;
+            this.currentSize = this.size;
 
-        if (!this.hasBeenSplit) {
-            this.floatSpeed = 0.01 + Math.random() * 0.02;
-            this.floatPhase = Math.random() * Math.PI * 2;
-        }
+            if (!this.hasBeenSplit) {
+                this.floatSpeed = 0.01 + Math.random() * 0.02;
+                this.floatPhase = Math.random() * Math.PI * 2;
+            }
     }
     
     update(deltaTime) {
@@ -864,7 +819,9 @@ function createParticles() {
     // Créer les particules pour les cercles supplémentaires
     for (let circleIndex = 0; circleIndex < config.additionalCircles; circleIndex++) {
         // Déterminer le nombre de particules et l'échelle en fonction du type de cercle
-        const particleCount = circleIndex === 1 ? config.greenCircleParticles : config.whiteCircleParticles;
+        const particleCount = circleIndex === 1 ? 
+            (config.greenCircleParticles + config.greenCircleExtraParticles) : 
+            config.whiteCircleParticles;
         const particleScale = circleIndex === 1 ? config.greenCircleParticleScale : config.whiteCircleParticleScale;
         
         for (let i = 0; i < particleCount; i++) {
@@ -874,6 +831,13 @@ function createParticles() {
             particle.additionalCircleIndex = circleIndex;
             particle.isStatic = true;
             particle.particleScale = particleScale;
+            // Marquer les particules supplémentaires du cercle vert
+            if (circleIndex === 1 && i >= config.greenCircleParticles) {
+                particle.isExtraGreenParticle = true;
+                particle.size = config.baseParticleSize * particleScale;
+                particle.currentSize = 0; // Commencer avec une taille de 0
+                particle.opacity = 1; // Garder une opacité constante
+            }
             particle.resetParticle();
             particles.push(particle);
         }
@@ -1243,7 +1207,7 @@ function setupControls() {
 
     if (showOuterCircle && showBorders && showMobileParticles) {
         const updateVisibility = () => {
-            particles.forEach(particle => {
+                particles.forEach(particle => {
                 // Réinitialiser l'état actif
                 particle.active = true;
 
@@ -1260,9 +1224,9 @@ function setupControls() {
                 // Gérer la visibilité des particules mobiles (uniquement celles qui ne sont pas statiques)
                 if (!showMobileParticles.checked && !particle.isStatic) {
                     particle.active = false;
-                }
-            });
-        };
+            }
+        });
+    };
 
         // Appliquer la visibilité initiale
         updateVisibility();

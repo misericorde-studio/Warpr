@@ -251,76 +251,73 @@ function updateCameraFromScroll() {
     const thirdSectionRect = thirdSection.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
-    // Calculer la progression du scroll pour la section 2
-    const section2Progress = Math.min(Math.max(0, 1 - (secondSectionRect.top / viewportHeight)), 1);
+    // Calculer le pourcentage de progression global
+    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const scrolled = window.scrollY;
+    const globalProgress = (scrolled / scrollHeight) * 100;
+
+    // Définir les seuils pour les différentes animations
+    const outerCircleStartFade = 35;
+    const outerCircleEndFade = 40;
+    const verticalSpacingStart = 20;
+    const verticalSpacingEnd = 60;
+    const innerColorStart = 49;
+    const innerColorEnd = 56;
+    const splitStart = 80;
+    const splitEnd = 100;
     
-    // Section 2: Transition des particules extérieures
-    if (section2Progress >= 0) {
-        const startColor = new THREE.Color(0xffffff);
-        const endColor = new THREE.Color(0x0C0E13);
-        
-        // Modifier la progression pour commencer à 50%
-        const adjustedProgress = Math.max(0, (section2Progress - 0.5) * 2);
-        
-        // Utiliser une courbe plus douce pour la transition
-        const smoothProgress = Math.pow(adjustedProgress, 0.5);
-        
-        // Interpoler la couleur
-        const currentColor = startColor.clone().lerp(endColor, smoothProgress);
-        
-        // Calculer l'opacité
-        // Commencer à diminuer l'opacité quand la couleur est proche de la couleur finale
-        let opacity = 1.0;
-        if (smoothProgress > 0.95) {
-            // Mapper 0.95-1.0 à 1.0-0.0 pour l'opacité
-            opacity = 1.0 - ((smoothProgress - 0.95) * 20); // 20 = 1/(1-0.95) pour normaliser
-        }
-        
-        // Appliquer la couleur et l'opacité aux particules extérieures
-        const colors = outerGeometry.attributes.color;
-        const opacities = outerGeometry.attributes.opacity;
-        
-        for (let i = 0; i < colors.count; i++) {
-            colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
-            opacities.setX(i, opacity);
-            
-            // Mettre à jour également les propriétés des particules individuelles
-            if (outerParticles[i]) {
-                outerParticles[i].color = currentColor;
-                outerParticles[i].opacity = opacity;
-            }
-        }
-        
-        colors.needsUpdate = true;
-        opacities.needsUpdate = true;
-    }
-    
-    // Calculer la progression pour la section 3 avec un décalage pour commencer plus tôt
-    const section3Progress = Math.min(Math.max(0, 1.25 - (thirdSectionRect.top / viewportHeight)), 1);
-    
-    // Calculer une progression d'opacité plus rapide (disparition plus tôt)
-    const opacityProgress = Math.min(1, section3Progress * 1.5);
-    
-    // Transition de l'espacement vertical des cercles
-    const startSpacing = config.additionalCircleVerticalSpacing;  // Utiliser la même valeur que dans la config
-    const endSpacing = 2.5;
-    const currentSpacing = startSpacing + (endSpacing - startSpacing) * section3Progress;
-    
-    // Couleurs pour la transition
+    // Calculer les progressions pour chaque animation
+    const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
+    const verticalSpacingProgress = Math.min(1, Math.max(0, (globalProgress - verticalSpacingStart) / (verticalSpacingEnd - verticalSpacingStart)));
+    const innerColorProgress = Math.min(1, Math.max(0, (globalProgress - innerColorStart) / (innerColorEnd - innerColorStart)));
+    const splitProgress = Math.min(1, Math.max(0, (globalProgress - splitStart) / (splitEnd - splitStart)));
+
+    // Animation du cercle extérieur
     const startColor = new THREE.Color(0xffffff);
     const endColor = new THREE.Color(0x0C0E13);
+    const smoothProgress = Math.pow(outerCircleProgress, 0.5);
+    const currentColor = startColor.clone().lerp(endColor, smoothProgress);
+    
+    let opacity = 1.0;
+    if (smoothProgress > 0.95) {
+        opacity = 1.0 - ((smoothProgress - 0.95) * 20);
+    }
+    
+    const colors = outerGeometry.attributes.color;
+    const opacities = outerGeometry.attributes.opacity;
+    
+    for (let i = 0; i < colors.count; i++) {
+        colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
+        opacities.setX(i, opacity);
+        
+        if (outerParticles[i]) {
+            outerParticles[i].color = currentColor;
+            outerParticles[i].opacity = opacity;
+        }
+    }
+    
+    colors.needsUpdate = true;
+    opacities.needsUpdate = true;
+
+    // Animation de l'espacement vertical et de la couleur des cercles intérieurs
+    const startSpacing = config.additionalCircleVerticalSpacing;
+    const endSpacing = 2.5;
+    const currentSpacing = startSpacing + (endSpacing - startSpacing) * verticalSpacingProgress;
+    
+    // Couleurs pour la transition
+    const startColorSpacing = new THREE.Color(0xffffff);
+    const endColorSpacing = new THREE.Color(0x0C0E13);
     
     // Suivre les cercles uniques traités
     const processedIndices = new Set();
     
-    // Mettre à jour l'opacité et la position des cercles
+    // Mettre à jour l'espacement et la couleur des cercles
     innerParticles.forEach(particle => {
         if (particle.isInnerCircle) {
             // Transition de couleur pour le cercle intérieur
-            const currentColor = startColor.clone().lerp(endColor, opacityProgress);
-            particle.color = currentColor;
-            particle.opacity = 1.0; // Maintenir l'opacité à 1
-            // Le cercle intérieur est maintenant à +2 espacements du centre
+            const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
+            particle.color = currentColorSpacing;
+            particle.opacity = 1.0;
             particle.y = 2 * currentSpacing;
         }
         
@@ -329,25 +326,21 @@ function updateCameraFromScroll() {
                 processedIndices.add(particle.additionalCircleIndex);
             }
             
-            // Mettre à jour la couleur des cercles blancs avec la progression accélérée
+            // Mettre à jour la couleur des cercles blancs
             if (particle.additionalCircleIndex !== 1) {
-                const currentColor = startColor.clone().lerp(endColor, opacityProgress);
-                particle.color = currentColor;
-                particle.opacity = 1.0; // Maintenir l'opacité à 1
+                const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
+                particle.color = currentColorSpacing;
+                particle.opacity = 1.0;
             }
             
             // Mettre à jour la position Y avec un espacement uniforme
             if (particle.additionalCircleIndex === 1) {
-                // Le cercle vert au centre
                 particle.y = 0;
             } else if (particle.additionalCircleIndex === 0) {
-                // Premier cercle blanc au-dessus du vert
                 particle.y = currentSpacing;
             } else if (particle.additionalCircleIndex === 2) {
-                // Premier cercle blanc en dessous du vert
                 particle.y = -currentSpacing;
             } else if (particle.additionalCircleIndex === 3) {
-                // Deuxième cercle blanc en dessous du vert
                 particle.y = -2 * currentSpacing;
             }
         }
@@ -358,73 +351,27 @@ function updateCameraFromScroll() {
     innerGeometry.attributes.color.needsUpdate = true;
     innerGeometry.attributes.opacity.needsUpdate = true;
     
-    // Calculer la progression du scroll pour la rotation
-    let rotationProgress = 1 - (secondSectionRect.top / viewportHeight);
-    rotationProgress = Math.max(0, Math.min(1, rotationProgress));
-    
-    // Calculer la progression du scroll pour la division des cercles
-    let splitProgress = 0;
-    
-    if (sections[2]) {
-        const thirdSection = sections[2];
-        const thirdSectionRect = thirdSection.getBoundingClientRect();
-    if (thirdSectionRect.top <= viewportHeight) {
-        splitProgress = 1 - (thirdSectionRect.top / viewportHeight);
-        splitProgress = Math.max(0, Math.min(1, splitProgress));
-        
+    // Animation de la rotation du contenu
+    // Rotation continue de 90° à -90° sur toute la durée du scroll
+    const currentRotationX = 90 - (180 * (globalProgress / 100));
+    particlesGroup.rotation.x = THREE.MathUtils.degToRad(currentRotationX);
+
+    // Animation de la distance de la caméra (de 0% à 40%)
+    const cameraProgress = Math.min(1, globalProgress / outerCircleEndFade);
+    const currentDistance = scrollConfig.startDistance - 
+                          ((scrollConfig.startDistance - scrollConfig.endDistance) * cameraProgress);
+    camera.position.z = currentDistance;
+
+    // Animation de division
+    if (splitProgress > 0) {
         config.splitAnimation.active = true;
         config.splitAnimation.currentSizeMultiplier = 1.0 - (1.0 - config.splitAnimation.particleScale) * splitProgress;
         config.splitAnimation.otherCirclesOpacity = 1.0 - splitProgress;
+        updateSplitAnimation(splitProgress);
     } else {
         config.splitAnimation.active = false;
         config.splitAnimation.currentSizeMultiplier = 1.0;
         config.splitAnimation.otherCirclesOpacity = 1.0;
-        }
-    }
-    
-    // Calculer la rotation X actuelle
-    let currentRotationX;
-    if (splitProgress > 0) {
-        // Deuxième mouvement : compléter la rotation jusqu'à 180°
-        const remainingRotation = 180 - (scrollConfig.startRotationX - scrollConfig.endRotationX);
-        currentRotationX = scrollConfig.endRotationX - (remainingRotation * splitProgress);
-        
-        // Calculer la distance de la caméra
-        const minDistance = scrollConfig.endDistance * 0.5; // Distance minimale (plus proche)
-        
-        // Calculer la progression du zoom basée uniquement sur la position de la section 2
-        const section2Progress = Math.max(0, Math.min(1, 1 - (secondSectionRect.top / viewportHeight)));
-        
-        // Calculer la distance actuelle en fonction de la progression de la section 2
-        const currentDistance = scrollConfig.startDistance + 
-                              (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
-        
-        // Appliquer le zoom supplémentaire uniquement pendant la section 2
-        if (section2Progress < 1) {
-            camera.position.z = currentDistance;
-        } else {
-            // Une fois la section 2 complètement visible, maintenir la distance finale
-            camera.position.z = scrollConfig.endDistance;
-        }
-    } else {
-        // Premier mouvement : de 90° à 11°
-        currentRotationX = scrollConfig.startRotationX + 
-                          (scrollConfig.endRotationX - scrollConfig.startRotationX) * rotationProgress;
-    
-        // Distance normale pendant la première étape
-    const currentDistance = scrollConfig.startDistance + 
-                          (scrollConfig.endDistance - scrollConfig.startDistance) * rotationProgress;
-        camera.position.z = currentDistance;
-    }
-    
-    // Convertir les degrés en radians et appliquer la rotation
-    const angleInRadians = THREE.MathUtils.degToRad(currentRotationX);
-    particlesGroup.rotation.x = angleInRadians;
-    
-    // Mettre à jour l'animation de division
-    if (config.splitAnimation.active && splitProgress > 0) {
-        updateSplitAnimation(splitProgress);
-    } else if (!config.splitAnimation.active) {
         updateSplitAnimation(0);
     }
 }

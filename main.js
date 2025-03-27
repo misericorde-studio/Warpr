@@ -317,55 +317,41 @@ function updateCameraFromScroll() {
     
     // Mettre à jour l'espacement et la couleur des cercles
     innerParticles.forEach(particle => {
-        if (particle.isInnerCircle) {
-            // Transition de couleur pour le cercle intérieur
+        // Transition de couleur selon le type de cercle
+        if (particle.isInnerCircle || (particle.isAdditionalCircle && particle.additionalCircleIndex !== 1)) {
+            // Pour les cercles blancs
             const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
             particle.color = currentColorSpacing;
             particle.opacity = 1.0;
-            particle.y = 2 * currentSpacing;
         }
-        
-        if (particle.isAdditionalCircle) {
-            if (!processedIndices.has(particle.additionalCircleIndex)) {
-                processedIndices.add(particle.additionalCircleIndex);
-            }
-            
-            // Mettre à jour la couleur des cercles blancs
-            if (particle.additionalCircleIndex !== 1) {
-                const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
-                particle.color = currentColorSpacing;
-                particle.opacity = 1.0;
 
-                // Calculer l'effet de flottement pour les cercles blancs
-                const verticalSpeed = 0.4 + (particle.additionalCircleIndex * 0.1);
-                const horizontalSpeed = 0.2 + (particle.additionalCircleIndex * 0.1);
-                const verticalAmplitude = 0.1;
-                const horizontalAmplitude = 0.05;
-                const individualOffset = particle.index * 0.5;
+        // Calculer l'effet de flottement pour tous les cercles
+        const verticalSpeed = 0.8 + (particle.additionalCircleIndex * 0.1);
+        const verticalAmplitude = 0.01;
+        const individualOffset = particle.index * 0.5;
 
-                const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
-                const horizontalOffsetX = Math.cos(time * horizontalSpeed + individualOffset) * horizontalAmplitude;
-                const horizontalOffsetZ = Math.sin(time * horizontalSpeed + individualOffset * 1.3) * horizontalAmplitude;
+        const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
 
-                // Mettre à jour la position Y avec un espacement uniforme
-                let baseY;
-                if (particle.additionalCircleIndex === 0) {
-                    baseY = currentSpacing;
-                } else if (particle.additionalCircleIndex === 2) {
-                    baseY = -currentSpacing;
-                } else if (particle.additionalCircleIndex === 3) {
-                    baseY = -2 * currentSpacing;
-                }
-
-                // Appliquer les offsets de flottement
-                particle.x = particle.originalX + horizontalOffsetX;
-                particle.y = baseY + verticalOffset;
-                particle.z = particle.originalZ + horizontalOffsetZ;
-            } else {
-                // Pour le cercle vert (index 1)
-                particle.y = 0;
+        // Mettre à jour la position Y avec un espacement uniforme
+        let baseY;
+        if (particle.isInnerCircle) {
+            baseY = 2 * currentSpacing;
+        } else if (particle.isAdditionalCircle) {
+            if (particle.additionalCircleIndex === 0) {
+                baseY = currentSpacing;
+            } else if (particle.additionalCircleIndex === 1) {
+                baseY = 0; // Cercle vert
+            } else if (particle.additionalCircleIndex === 2) {
+                baseY = -currentSpacing;
+            } else if (particle.additionalCircleIndex === 3) {
+                baseY = -2 * currentSpacing;
             }
         }
+
+        // Appliquer l'offset vertical à tous les cercles
+        particle.x = particle.originalX;
+        particle.y = baseY + verticalOffset;
+        particle.z = particle.originalZ;
     });
     
     // Forcer la mise à jour des attributs de géométrie
@@ -559,7 +545,7 @@ class Particle {
             if (isBorder) {
                 // Pour les particules de bordure, les placer près du bord du cercle
                 const borderWidth = this.isAdditionalCircle ? config.additionalCircleBorderWidth : config.innerBorderWidth;
-                radiusFactor = 1.0 - borderWidth + Math.random() * (borderWidth * 2); // Distribuer autour du bord
+                radiusFactor = 1.0 - borderWidth + Math.random() * (borderWidth * 2);
             } else {
                 // Pour les particules normales, utiliser la distribution habituelle
                 radiusFactor = Math.pow(Math.random(), 0.5) * config.innerCircleFill;
@@ -578,26 +564,23 @@ class Particle {
                 this.y = 2 * config.additionalCircleVerticalSpacing;
             } else if (this.isAdditionalCircle) {
                 if (this.additionalCircleIndex === 1) {
-                    // Le cercle vert au centre
                     this.y = 0;
                 } else if (this.additionalCircleIndex === 0) {
-                    // Premier cercle blanc au-dessus du vert
                     this.y = config.additionalCircleVerticalSpacing;
                 } else {
-                    // Les deux cercles blancs en dessous du vert
                     const offset = this.additionalCircleIndex - 1;
                     this.y = -offset * config.additionalCircleVerticalSpacing;
                 }
             }
             
             // Taille des particules avec la nouvelle échelle
-            if (this.isInnerCircle) {
-                this.size = config.baseParticleSize * (isBorder ? config.additionalCircleBorderScale : (0.7 + Math.random() * 0.6));
-            } else if (this.isAdditionalCircle) {
-                const baseScale = this.additionalCircleIndex === 1 ? 
-                    config.greenCircleParticleScale : 
-                    config.whiteCircleParticleScale;
+            if (this.isInnerCircle || (this.isAdditionalCircle && this.additionalCircleIndex !== 1)) {
+                // Utiliser la même échelle pour tous les cercles blancs
+                const baseScale = config.whiteCircleParticleScale;
                 this.size = config.baseParticleSize * (isBorder ? config.additionalCircleBorderScale : baseScale) * (0.7 + Math.random() * 0.6);
+            } else if (this.isAdditionalCircle && this.additionalCircleIndex === 1) {
+                // Pour le cercle vert
+                this.size = config.baseParticleSize * (isBorder ? config.additionalCircleBorderScale : config.greenCircleParticleScale) * (0.7 + Math.random() * 0.6);
             }
             this.currentSize = this.size;
             
@@ -618,11 +601,6 @@ class Particle {
         } else {
             // Réinitialiser en tant que particule du cercle extérieur
             this.resetOuterParticle();
-        }
-        
-        // Ne pas réinitialiser la taille si c'est une particule supplémentaire
-        if (!this.isExtraGreenParticle) {
-            this.currentSize = this.size;
         }
     }
     
@@ -1081,8 +1059,8 @@ function animate() {
 
         const idx = i * 3;
 
-        // Appliquer un léger flottement vertical pour les cercles blancs
-        if (particle.isAdditionalCircle && particle.additionalCircleIndex !== 1) {
+        // Appliquer un léger flottement vertical pour tous les cercles intérieurs
+        if (particle.isAdditionalCircle || particle.isInnerCircle) {
             // S'assurer que chaque particule a une phase initiale
             if (particle.floatPhase === undefined) {
                 particle.floatPhase = Math.random() * Math.PI * 2;
@@ -1091,7 +1069,7 @@ function animate() {
             // Créer un mouvement vertical très léger et unique pour chaque particule
             const verticalOffset = Math.sin(time * 0.5 + particle.floatPhase) * 0.03;
 
-            // Appliquer uniquement l'offset vertical
+            // Appliquer l'offset vertical
             innerGeometry.attributes.position.array[idx] = particle.x;
             innerGeometry.attributes.position.array[idx + 1] = particle.y + verticalOffset;
             innerGeometry.attributes.position.array[idx + 2] = particle.z;

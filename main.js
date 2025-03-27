@@ -262,8 +262,8 @@ function updateCameraFromScroll() {
     const outerCircleEndFade = 40;
     const verticalSpacingStart = 20;
     const verticalSpacingEnd = 60;
-    const innerColorStart = 60;
-    const innerColorEnd = 65;
+    const innerColorStart = 65;
+    const innerColorEnd = 70;
     const splitStart = 65;
     const splitEnd = 95;
     

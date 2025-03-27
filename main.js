@@ -248,22 +248,43 @@ function updateCameraFromScroll() {
     // Calculer la progression du scroll pour la section 2
     const section2Progress = Math.min(Math.max(0, 1 - (secondSectionRect.top / viewportHeight)), 1);
     
-    // Transition de couleur pour le cercle extérieur
-    const startColor = new THREE.Color(0xffffff);
-    const endColor = new THREE.Color(0x0C0E13);
-    // Debug: Afficher les composantes RGB exactes
-    console.log('End color RGB:', endColor.r.toFixed(4), endColor.g.toFixed(4), endColor.b.toFixed(4));
-    const currentColor = startColor.lerp(endColor, section2Progress);
-    
-    // Appliquer la couleur aux particules du cercle extérieur
-    outerParticles.forEach((particle, i) => {
-        const idx = i * 3;
-        outerGeometry.attributes.color.array[idx] = currentColor.r;
-        outerGeometry.attributes.color.array[idx + 1] = currentColor.g;
-        outerGeometry.attributes.color.array[idx + 2] = currentColor.b;
-        particle.color = currentColor;
-    });
-    outerGeometry.attributes.color.needsUpdate = true;
+    // Section 2: Transition des particules extérieures
+    if (section2Progress >= 0) {
+        const startColor = new THREE.Color(0xffffff);
+        const endColor = new THREE.Color(0x0C0E13);
+        
+        // Utiliser une courbe plus douce pour la transition
+        const smoothProgress = Math.pow(section2Progress, 0.5);
+        
+        // Interpoler la couleur
+        const currentColor = startColor.clone().lerp(endColor, smoothProgress);
+        
+        // Calculer l'opacité
+        // Commencer à diminuer l'opacité quand la couleur est proche de la couleur finale
+        let opacity = 1.0;
+        if (smoothProgress > 0.95) {
+            // Mapper 0.95-1.0 à 1.0-0.0 pour l'opacité
+            opacity = 1.0 - ((smoothProgress - 0.95) * 20); // 20 = 1/(1-0.95) pour normaliser
+        }
+        
+        // Appliquer la couleur et l'opacité aux particules extérieures
+        const colors = outerGeometry.attributes.color;
+        const opacities = outerGeometry.attributes.opacity;
+        
+        for (let i = 0; i < colors.count; i++) {
+            colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
+            opacities.setX(i, opacity);
+            
+            // Mettre à jour également les propriétés des particules individuelles
+            if (outerParticles[i]) {
+                outerParticles[i].color = currentColor;
+                outerParticles[i].opacity = opacity;
+            }
+        }
+        
+        colors.needsUpdate = true;
+        opacities.needsUpdate = true;
+    }
     
     // Calculer la progression pour la section 3
     const section3Progress = Math.min(Math.max(0, 1 - (thirdSectionRect.top / viewportHeight)), 1);
@@ -824,23 +845,25 @@ function createParticlesMaterial(isOuterCircle = false) {
                 // Création d'un point lumineux avec une transition nette
                 float alpha = 1.0 - smoothstep(threshold, threshold + 0.01, dist);
                 
-                // Pour le cercle extérieur, pas de transparence
-                alpha = ${isOuterCircle ? '1.0' : 'alpha * vOpacity'};
+                // Appliquer l'opacité de la particule avec une courbe plus agressive
+                alpha *= pow(vOpacity, 1.5); // Utiliser une puissance > 1 pour une disparition plus rapide
                 
                 // Forcer les valeurs RGB exactes pour la couleur de fond
                 vec3 finalColor = vColor;
                 if(finalColor.r <= 0.05 && finalColor.g <= 0.06 && finalColor.b <= 0.08) {
                     finalColor = vec3(0.047, 0.055, 0.075); // Valeurs exactes pour 0x0C0E13
+                    // Forcer une opacité nulle quand on atteint la couleur de fond
+                    alpha = 0.0;
                 }
                 
                 // Couleur finale
                 gl_FragColor = vec4(finalColor, alpha);
                 
-                // Rejeter les fragments au-delà du seuil
-                if (dist > threshold + 0.01) discard;
+                // Rejeter les fragments au-delà du seuil ou complètement transparents
+                if (dist > threshold + 0.01 || alpha < 0.01) discard;
             }
         `,
-        transparent: !isOuterCircle,
+        transparent: true,
         depthTest: true,
         depthWrite: isOuterCircle,
         blending: THREE.NormalBlending

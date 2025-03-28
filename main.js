@@ -734,8 +734,8 @@ class Particle {
             this.size = config.outerCircleParticleSize;
             this.currentSize = this.size;
             
-            // Paramètres de mouvement pour les particules mobiles
-            this.speed = config.particleSpeed * (0.2 + Math.random() * 0.3);
+            // Paramètres de mouvement pour les particules mobiles avec une vitesse augmentée
+            this.speed = config.particleSpeed * (0.4 + Math.random() * 0.4);
             this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
             
             // Position initiale pour les particules mobiles
@@ -744,7 +744,7 @@ class Particle {
             this.x = Math.cos(angle) * this.radius;
             this.z = Math.sin(angle) * this.radius;
             this.y = 0;
-
+            
             // Réinitialiser les paramètres de flottement pour les particules mobiles
             this.floatSpeed = 0;
             this.floatPhase = 0;
@@ -1202,18 +1202,19 @@ function animate() {
                 particle.floatPhase = Math.random() * Math.PI * 2;
             }
             
-            // Créer un mouvement vertical très léger et unique pour chaque particule
-            const verticalOffset = Math.sin(time * 0.5 + particle.floatPhase) * 0.03;
+            // Créer un mouvement vertical plus prononcé pour chaque particule
+            const verticalOffset = Math.sin(time * 0.5 + particle.floatPhase) * 0.05;
+            const horizontalOffset = Math.cos(time * 0.3 + particle.floatPhase) * 0.03;
 
-            // Appliquer l'offset vertical
-            innerGeometry.attributes.position.array[idx] = particle.x;
+            // Appliquer les offsets
+            innerGeometry.attributes.position.array[idx] = particle.x + horizontalOffset;
             innerGeometry.attributes.position.array[idx + 1] = particle.y + verticalOffset;
-            innerGeometry.attributes.position.array[idx + 2] = particle.z;
+            innerGeometry.attributes.position.array[idx + 2] = particle.z + horizontalOffset;
         } else {
             // Pour les autres particules, utiliser leur position normale
-        innerGeometry.attributes.position.array[idx] = particle.x;
-        innerGeometry.attributes.position.array[idx + 1] = particle.y;
-        innerGeometry.attributes.position.array[idx + 2] = particle.z;
+            innerGeometry.attributes.position.array[idx] = particle.x;
+            innerGeometry.attributes.position.array[idx + 1] = particle.y;
+            innerGeometry.attributes.position.array[idx + 2] = particle.z;
         }
         
         innerGeometry.attributes.size.array[i] = particle.currentSize;

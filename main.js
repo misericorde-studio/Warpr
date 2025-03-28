@@ -666,7 +666,10 @@ class Particle {
         const random = Math.random();
         const isInnerBorder = random < config.innerBorderParticleRatio;
         const isOuterBorder = !isInnerBorder && random < (config.innerBorderParticleRatio + config.outerBorderParticleRatio);
-        const isMobile = !isInnerBorder && !isOuterBorder && !this.isStatic;
+        
+        // Augmenter la proportion de particules statiques
+        const staticThreshold = 0.7; // 70% de particules statiques
+        const shouldBeStatic = !isInnerBorder && !isOuterBorder && Math.random() < staticThreshold;
         
         // Définir le rayon et la taille en fonction du type
         if (isInnerBorder) {
@@ -683,20 +686,20 @@ class Particle {
             this.size = config.outerCircleBorderParticleSize;
             this.isStatic = true;
             this.isBorder = true;
-        } else if (isMobile) {
+        } else if (shouldBeStatic) {
+            // Particules statiques du cercle principal
+            const randomOffset = (Math.random() - 0.5) * config.outerCircleWidth;
+            this.radius = config.outerRadius + randomOffset;
+            this.size = config.outerCircleParticleSize;
+            this.isStatic = true;
+            this.isBorder = false;
+        } else {
             // Particules mobiles
             this.radius = config.outerRadius;
             this.size = config.outerCircleParticleSize * 0.4;
             this.isStatic = false;
             this.isBorder = false;
             this.currentSize = this.size;
-        } else {
-            // Particules statiques du cercle principal
-            const randomOffset = (Math.random() - 0.5) * config.outerCircleWidth;
-            this.radius = config.outerRadius + randomOffset;
-            this.size = config.outerCircleParticleSize;
-            this.isStatic = Math.random() > config.outerCircleDensity;
-            this.isBorder = false;
         }
         
         this.angle = angle;
@@ -712,12 +715,9 @@ class Particle {
         this.active = true;
         
         // Ne pas réinitialiser currentSize pour les particules mobiles
-        if (!isMobile) {
-            this.currentSize = this.size;
-        }
-
-        // Initialiser les paramètres de flottement pour toutes les particules statiques
         if (this.isStatic) {
+            this.currentSize = this.size;
+            // Initialiser les paramètres de flottement pour toutes les particules statiques
             this.floatSpeed = 0.02 + Math.random() * 0.03;
             this.floatPhase = Math.random() * Math.PI * 2;
             this.floatAmplitude = 0.02 + Math.random() * 0.03;
@@ -762,7 +762,7 @@ class Particle {
             // Utiliser une courbe plus douce pour la transition de taille
             const smoothFactor = Math.sin(sizeFactor * Math.PI / 2);
             this.currentSize = this.size * smoothFactor;
-        } else {
+        } else if (this.floatSpeed) { // Vérifier que les paramètres de flottement sont initialisés
             // Effet de flottement pour toutes les particules statiques
             this.floatPhase += this.floatSpeed;
             

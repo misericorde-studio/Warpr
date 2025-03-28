@@ -262,6 +262,9 @@ function updateCameraFromScroll() {
     const outerCircleEndFade = 40;
     const verticalSpacingStart = 20;
     const verticalSpacingEnd = 60;
+    const shrinkStart = 55;
+    const shrinkStartClose = 58;
+    const shrinkEnd = 70;
     const innerColorStart = 65;
     const innerColorEnd = 70;
     const splitStart = 65;
@@ -270,6 +273,8 @@ function updateCameraFromScroll() {
     // Calculer les progressions pour chaque animation
     const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
     const verticalSpacingProgress = Math.min(1, Math.max(0, (globalProgress - verticalSpacingStart) / (verticalSpacingEnd - verticalSpacingStart)));
+    const shrinkProgress = Math.min(1, Math.max(0, (globalProgress - shrinkStart) / (shrinkEnd - shrinkStart)));
+    const shrinkProgressClose = Math.min(1, Math.max(0, (globalProgress - shrinkStartClose) / (shrinkEnd - shrinkStartClose)));
     const innerColorProgress = Math.min(1, Math.max(0, (globalProgress - innerColorStart) / (innerColorEnd - innerColorStart)));
     const splitProgress = Math.min(1, Math.max(0, (globalProgress - splitStart) / (splitEnd - splitStart)));
 
@@ -323,6 +328,41 @@ function updateCameraFromScroll() {
             const currentColorSpacing = startColorSpacing.clone().lerp(endColorSpacing, innerColorProgress);
             particle.color = currentColorSpacing;
             particle.opacity = 1.0;
+
+            // Animation de réduction pour les cercles blancs
+            if (shrinkProgress > 0 && !particle.hasBeenSplit) {
+                // Sauvegarder la position originale si ce n'est pas déjà fait
+                if (!particle.shrinkStartPosition) {
+                    particle.shrinkStartPosition = {
+                        x: particle.originalX,
+                        y: particle.originalY,
+                        z: particle.originalZ
+                    };
+                }
+
+                // Déterminer quel progrès utiliser en fonction de la position du cercle
+                let currentProgress;
+                if (particle.additionalCircleIndex === 0 || particle.additionalCircleIndex === 2) {
+                    // Pour les cercles proches du cercle vert (juste au-dessus et juste en-dessous)
+                    currentProgress = shrinkProgressClose;
+                } else {
+                    // Pour les cercles éloignés (tout en haut et tout en bas)
+                    currentProgress = shrinkProgress;
+                }
+
+                // Calculer la nouvelle position en se dirigeant vers le centre de leur cercle respectif
+                const baseY = particle.shrinkStartPosition.y;
+                
+                // Interpolation entre la position de départ et le centre (0 sur X et Z)
+                particle.originalX = particle.shrinkStartPosition.x * (1 - currentProgress);
+                particle.originalZ = particle.shrinkStartPosition.z * (1 - currentProgress);
+                particle.originalY = baseY; // Maintenir la position Y pour garder les cercles séparés
+                
+                // Appliquer les nouvelles positions
+                particle.x = particle.originalX;
+                particle.y = particle.originalY;
+                particle.z = particle.originalZ;
+            }
         }
 
         // Calculer l'effet de flottement pour tous les cercles

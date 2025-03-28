@@ -302,7 +302,7 @@ function updateCameraFromScroll() {
 
     // Animation de l'espacement vertical et de la couleur des cercles intérieurs
     const startSpacing = config.additionalCircleVerticalSpacing;
-    const endSpacing = 1;
+    const endSpacing = 1.5;
     const currentSpacing = startSpacing + (endSpacing - startSpacing) * verticalSpacingProgress;
     
     // Couleurs pour la transition

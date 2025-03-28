@@ -354,13 +354,23 @@ function updateCameraFromScroll() {
                 // Calculer la nouvelle position en se dirigeant vers le centre de leur cercle respectif
                 const baseY = particle.shrinkStartPosition.y;
                 
-                // Interpolation entre la position de départ et le centre (0 sur X et Z)
-                particle.originalX = particle.shrinkStartPosition.x * (1 - currentProgress);
-                particle.originalZ = particle.shrinkStartPosition.z * (1 - currentProgress);
+                // Utiliser une interpolation non-linéaire pour que les particules convergent plus progressivement
+                const nonLinearProgress = Math.pow(currentProgress, 2.0); // Démarrage plus doux (était 0.5)
+                const convergenceSpeed = Math.sqrt(
+                    Math.pow(particle.shrinkStartPosition.x, 2) + 
+                    Math.pow(particle.shrinkStartPosition.z, 2)
+                ) / config.innerRadius; // Plus la particule est loin, plus elle va vite
+
+                // Ajouter une compression supplémentaire vers le centre
+                const compressionFactor = Math.pow(nonLinearProgress, 0.7); // Facteur de compression progressif
+                const finalScale = 0.2 + (1.0 - compressionFactor) * 0.8; // Échelle finale entre 0.2 et 1.0
+
+                particle.originalX = particle.shrinkStartPosition.x * (1 - nonLinearProgress * convergenceSpeed) * finalScale;
+                particle.originalZ = particle.shrinkStartPosition.z * (1 - nonLinearProgress * convergenceSpeed) * finalScale;
                 particle.originalY = baseY; // Maintenir la position Y pour garder les cercles séparés
                 
                 // Réduire la taille progressivement (jusqu'à 40% de la taille originale)
-                const targetSize = particle.originalSize * 0.2;
+                const targetSize = particle.originalSize * 0.4;
                 particle.currentSize = particle.originalSize - (particle.originalSize - targetSize) * currentProgress;
                 
                 // Appliquer les nouvelles positions

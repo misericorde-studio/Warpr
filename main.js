@@ -959,7 +959,7 @@ scene.add(guideCircles);
 // Redimensionnement de la fenêtre
 // Fonction pour ajuster la taille du renderer à celle du conteneur
 function updateRendererSize() {
-    const container = document.querySelector('.airdrop_left');
+    const container = document.getElementById('canvas-container');
     if (container) {
         const width = container.clientWidth;
         const height = container.clientHeight;
@@ -967,11 +967,7 @@ function updateRendererSize() {
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
     } else {
-        // Fallback au cas où le conteneur n'est pas trouvé
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        console.error("Canvas container not found");
     }
 }
 

@@ -11,7 +11,7 @@ const config = {
     // Paramètres des particules
     innerCircleParticles: 100, // Nombre de particules dans le cercle intérieur
     outerCircleParticles: 2000, // Nombre de particules dans le cercle extérieur (augmenté)
-    baseParticleSize: 0.60,    // Taille de base des particules
+    baseParticleSize: 0.45,    // Taille de base des particules (réduite de 0.60)
     outerCircleParticleSize: 0.75,     // Grosses particules pour le cercle principal
     outerCircleBorderParticleSize: 0.75, // Petites particules pour les bordures
     outerCircleWidth: 0.5,      // Largeur du cercle extérieur principal
@@ -45,9 +45,9 @@ const config = {
     additionalCircles: 4,      // 3 blancs + 1 vert (le cercle intérieur compte comme un blanc)
     whiteCircleParticles: 100, // Nombre de particules pour les cercles blancs
     greenCircleParticles: 100, // Nombre de particules pour le cercle vert
-    greenCircleExtraParticles: 100, // Nouvelles particules pour l'animation de division
-    whiteCircleParticleScale: 0.8, // Facteur d'échelle pour les particules des cercles blancs
-    greenCircleParticleScale: 0.9, // Facteur d'échelle pour les particules du cercle vert
+    greenCircleExtraParticles: 500, // Nouvelles particules pour l'animation de division
+    whiteCircleParticleScale: 0.7, // Facteur d'échelle pour les particules des cercles blancs (réduit de 0.8)
+    greenCircleParticleScale: 0.8, // Facteur d'échelle pour les particules du cercle vert (réduit de 0.9)
     additionalCircleVerticalSpacing: 0.15, // Espacement vertical initial entre les cercles
     
     // NOUVEAU: Paramètres pour les bordures des cercles additionnels
@@ -63,11 +63,11 @@ const config = {
         circleFill: 0.9, // Remplissage des petits cercles (0-1)
         transitionDuration: 1.0, // Durée de la transition
         active: false, // État de l'animation
-        particleScale: 0.3, // Facteur d'échelle plus petit pour les particules des cercles de fin (était 0.5)
+        particleScale: 0.2, // Facteur d'échelle plus petit pour les particules des cercles de fin
         currentSizeMultiplier: 1.0, // Variable pour contrôler la taille actuelle des particules en fonction du scroll
         otherCirclesOpacity: 1.0, // Opacité des autres cercles verticaux (contrôlée par le scroll)
-        borderParticleRatio: 0.6,    // Ratio de particules pour les bordures des petits cercles (augmenté de 0.35 à 0.6)
-        borderParticleScale: 0.3,     // Échelle des particules de bordure pour les petits cercles
+        borderParticleRatio: 0.6,    // Ratio de particules pour les bordures des petits cercles
+        borderParticleScale: 0.2,     // Échelle des particules de bordure pour les petits cercles
     }
 };
 

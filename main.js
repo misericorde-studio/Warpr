@@ -1164,7 +1164,15 @@ function animate() {
     const currentTime = performance.now();
     requestAnimationFrame(animate);
     
+    // Calculer le shrinkProgress ici
+    let shrinkProgress = 0;
     if (hasScrolled) {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrolled = window.scrollY;
+        const globalProgress = (scrolled / scrollHeight) * 100;
+        const shrinkStart = 55;
+        const shrinkEnd = 70;
+        shrinkProgress = Math.min(1, Math.max(0, (globalProgress - shrinkStart) / (shrinkEnd - shrinkStart)));
         updateCameraFromScroll();
     } else {
         // Si on n'a pas encore scrollé, garder les particules blanches
@@ -1203,8 +1211,15 @@ function animate() {
             }
             
             // Créer un mouvement vertical plus prononcé pour chaque particule
-            const verticalOffset = Math.sin(time * 1.2 + particle.floatPhase) * 0.05;
-            const horizontalOffset = Math.cos(time * 0.8 + particle.floatPhase) * 0.03;
+            let floatScale = 1.0;
+            if (shrinkProgress > 0 && !particle.hasBeenSplit) {
+                // Utiliser le même facteur d'échelle que pour la taille
+                const targetSize = particle.originalSize * 0.4;
+                const currentSizeRatio = (particle.currentSize - targetSize) / (particle.originalSize - targetSize);
+                floatScale = Math.max(0.2, currentSizeRatio);
+            }
+            const verticalOffset = Math.sin(time * 1.2 + particle.floatPhase) * 0.05 * floatScale;
+            const horizontalOffset = Math.cos(time * 0.8 + particle.floatPhase) * 0.03 * floatScale;
 
             // Appliquer les offsets
             innerGeometry.attributes.position.array[idx] = particle.x + horizontalOffset;

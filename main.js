@@ -385,8 +385,8 @@ function updateCameraFromScroll() {
         const individualOffset = particle.index * 0.5;
 
         const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
-
-        // Mettre à jour la position Y avec un espacement uniforme
+            
+            // Mettre à jour la position Y avec un espacement uniforme
         let baseY;
         if (particle.isInnerCircle) {
             baseY = 2 * currentSpacing;
@@ -534,7 +534,7 @@ function updateSplitAnimation(progress) {
         const verticalOffset = Math.sin(time * verticalSpeed + individualOffset) * verticalAmplitude;
         const horizontalOffsetX = Math.cos(time * horizontalSpeed + individualOffset) * horizontalAmplitude;
         const horizontalOffsetZ = Math.sin(time * horizontalSpeed + individualOffset * 1.3) * horizontalAmplitude;
-
+        
         // Interpoler entre la position de départ et la position cible
         const baseX = particle.splitStartPosition.x * (1 - easeProgress) + particle.splitTarget.x * easeProgress;
         const baseZ = particle.splitStartPosition.z * (1 - easeProgress) + particle.splitTarget.z * easeProgress;
@@ -675,23 +675,28 @@ class Particle {
             this.radius = config.outerRadius - config.innerBorderWidth/2 + randomOffset;
             this.size = config.outerCircleBorderParticleSize;
             this.isStatic = true;
+            this.isBorder = true;
         } else if (isOuterBorder) {
             // Particules de la bordure extérieure
             const randomOffset = (Math.random() - 0.5) * config.outerBorderWidth;
             this.radius = config.outerRadius + config.outerBorderWidth/2 + randomOffset;
             this.size = config.outerCircleBorderParticleSize;
             this.isStatic = true;
+            this.isBorder = true;
         } else if (isMobile) {
             // Particules mobiles
             this.radius = config.outerRadius;
-            this.size = config.mobileParticleSize;
+            this.size = config.outerCircleParticleSize * 0.4;
             this.isStatic = false;
+            this.isBorder = false;
+            this.currentSize = this.size;
         } else {
             // Particules statiques du cercle principal
             const randomOffset = (Math.random() - 0.5) * config.outerCircleWidth;
             this.radius = config.outerRadius + randomOffset;
             this.size = config.outerCircleParticleSize;
             this.isStatic = Math.random() > config.outerCircleDensity;
+            this.isBorder = false;
         }
         
         this.angle = angle;
@@ -700,17 +705,23 @@ class Particle {
         
         // Calculer la position directement
         this.x = Math.cos(this.angle) * this.radius;
-        this.y = (Math.random() - 0.5) * 0.3;
+        this.y = 0;
         this.z = Math.sin(this.angle) * this.radius;
         
         this.distanceTraveled = 0;
         this.active = true;
+        
+        // Ne pas réinitialiser currentSize pour les particules mobiles
+        if (!isMobile) {
             this.currentSize = this.size;
+        }
 
-            if (!this.hasBeenSplit) {
-                this.floatSpeed = 0.01 + Math.random() * 0.02;
-                this.floatPhase = Math.random() * Math.PI * 2;
-            }
+        // Initialiser les paramètres de flottement pour toutes les particules statiques
+        if (this.isStatic) {
+            this.floatSpeed = 0.02 + Math.random() * 0.03;
+            this.floatPhase = Math.random() * Math.PI * 2;
+            this.floatAmplitude = 0.02 + Math.random() * 0.03;
+        }
     }
     
     update(deltaTime) {
@@ -721,47 +732,54 @@ class Particle {
             return;
         }
 
-        if (this.isStatic) {
-            if (!this.hasBeenSplit) {
-                this.floatPhase += this.floatSpeed;
-                const float = Math.sin(this.floatPhase) * 0.15 + 1;
-                this.currentSize = this.size * float;
+        if (!this.isStatic) {
+            // Déplacement des particules mobiles
+            this.distanceTraveled += this.speed * this.direction;
+            
+            // Si la particule a atteint sa distance maximale, la réinitialiser
+            if (Math.abs(this.distanceTraveled) > config.maxParticleDistance) {
+                this.resetOuterParticle();
+                return;
             }
-            return;
+            
+            // Calculer la nouvelle position radiale
+            const currentRadius = this.radius + this.distanceTraveled;
+            
+            // Si la particule va vers l'intérieur et atteint le cercle intérieur, la réinitialiser
+            if (this.direction < 0 && currentRadius <= config.innerRadius) {
+                this.resetOuterParticle();
+                return;
+            }
+            
+            // Mettre à jour la position
+            this.x = Math.cos(this.angle) * currentRadius;
+            this.z = Math.sin(this.angle) * currentRadius;
+            
+            // Calcul de la taille basé sur la distance parcourue avec une transition plus douce
+            const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
+            const sizeFactor = Math.max(0, 1 - distanceRatio);
+            
+            // Utiliser une courbe plus douce pour la transition de taille
+            const smoothFactor = Math.sin(sizeFactor * Math.PI / 2);
+            this.currentSize = this.size * smoothFactor;
+        } else {
+            // Effet de flottement pour toutes les particules statiques
+            this.floatPhase += this.floatSpeed;
+            
+            // Calculer les offsets de flottement avec des fréquences plus rapides
+            const xOffset = Math.sin(this.floatPhase * 0.7) * this.floatAmplitude;
+            const yOffset = Math.cos(this.floatPhase * 0.9) * this.floatAmplitude;
+            const zOffset = Math.sin(this.floatPhase * 0.8) * this.floatAmplitude;
+            
+            // Position de base (position originale sur le cercle)
+            const baseX = Math.cos(this.angle) * this.radius;
+            const baseZ = Math.sin(this.angle) * this.radius;
+            
+            // Appliquer les offsets à la position de base
+            this.x = baseX + xOffset;
+            this.y = yOffset;
+            this.z = baseZ + zOffset;
         }
-        
-        // Déplacement des particules du cercle extérieur uniquement
-        this.distanceTraveled += this.speed * this.direction;
-        
-        // Si la particule a atteint sa distance maximale, la réinitialiser
-        if (Math.abs(this.distanceTraveled) > config.maxParticleDistance) {
-            this.resetOuterParticle();
-            return;
-        }
-        
-        // Calculer la nouvelle position radiale
-        const currentRadius = this.radius + this.distanceTraveled;
-        
-        // Si la particule va vers l'intérieur et atteint le cercle intérieur, la réinitialiser
-        if (this.direction < 0 && currentRadius <= config.innerRadius) {
-            this.resetOuterParticle();
-            return;
-        }
-        
-        // Mettre à jour la position
-        this.x = Math.cos(this.angle) * currentRadius;
-        this.z = Math.sin(this.angle) * currentRadius;
-        
-        // Petite oscillation verticale pendant le mouvement
-        this.y += (Math.random() - 0.5) * 0.01;
-        this.y *= 0.98; // Amortissement pour éviter une trop grande dispersion
-        
-        // Calcul de la taille basé sur la distance parcourue
-        const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
-        const sizeFactor = Math.max(0, 1 - distanceRatio);
-        
-        // Appliquer une courbe quadratique pour une diminution plus naturelle
-        this.currentSize = this.size * (sizeFactor * sizeFactor);
     }
 }
 
@@ -1106,7 +1124,7 @@ function animate() {
         if (!particle.isStatic) {
             particle.update(0.016);
         }
-
+        
         const idx = i * 3;
 
         // Appliquer un léger flottement vertical pour tous les cercles intérieurs
@@ -1125,9 +1143,9 @@ function animate() {
             innerGeometry.attributes.position.array[idx + 2] = particle.z;
         } else {
             // Pour les autres particules, utiliser leur position normale
-            innerGeometry.attributes.position.array[idx] = particle.x;
-            innerGeometry.attributes.position.array[idx + 1] = particle.y;
-            innerGeometry.attributes.position.array[idx + 2] = particle.z;
+        innerGeometry.attributes.position.array[idx] = particle.x;
+        innerGeometry.attributes.position.array[idx + 1] = particle.y;
+        innerGeometry.attributes.position.array[idx + 2] = particle.z;
         }
         
         innerGeometry.attributes.size.array[i] = particle.currentSize;
@@ -1149,6 +1167,23 @@ function animate() {
         if (!particle.isStatic) {
             particle.update(0.016);
             movingCount++;
+        } else if (!particle.isBorder && particle.size === config.outerCircleParticleSize) {
+            // Effet de flottement uniquement pour les grosses particules statiques du cercle principal
+            particle.floatPhase += particle.floatSpeed;
+            
+            // Calculer les offsets de flottement avec une amplitude plus importante
+            const xOffset = Math.sin(particle.floatPhase * 0.5) * 0.04;
+            const yOffset = Math.cos(particle.floatPhase * 0.7) * 0.04;
+            const zOffset = Math.sin(particle.floatPhase * 0.6) * 0.04;
+            
+            // Position de base (position originale sur le cercle)
+            const baseX = Math.cos(particle.angle) * particle.radius;
+            const baseZ = Math.sin(particle.angle) * particle.radius;
+            
+            // Appliquer les offsets à la position de base
+            particle.x = baseX + xOffset;
+            particle.y = yOffset;
+            particle.z = baseZ + zOffset;
         }
         
         const idx = i * 3;
@@ -1157,7 +1192,6 @@ function animate() {
         outerGeometry.attributes.position.array[idx + 2] = particle.z;
         
         outerGeometry.attributes.size.array[i] = particle.currentSize;
-        
         outerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     

@@ -670,6 +670,13 @@ class Particle {
     
     // Méthode pour réinitialiser spécifiquement une particule du cercle extérieur
     resetOuterParticle() {
+        // Réinitialiser d'abord tous les paramètres de mouvement et de flottement
+        this.floatSpeed = 0;
+        this.floatPhase = 0;
+        this.floatAmplitude = 0;
+        this.distanceTraveled = 0;
+        this.y = 0;
+
         const angle = Math.random() * Math.PI * 2;
         
         // Déterminer le type de particule
@@ -709,25 +716,23 @@ class Particle {
             this.size = config.outerCircleParticleSize * 0.4;
             this.isStatic = false;
             this.isBorder = false;
-            this.currentSize = this.size;
         }
         
         this.angle = angle;
-        this.speed = config.particleSpeed * (0.8 + Math.random() * 0.4);
-        this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
         
-        // Calculer la position directement
+        // Calculer la position initiale
         this.x = Math.cos(this.angle) * this.radius;
-        this.y = 0;
         this.z = Math.sin(this.angle) * this.radius;
         
-        this.distanceTraveled = 0;
         this.active = true;
-        
-        // Ne pas réinitialiser currentSize pour les particules mobiles
-        if (this.isStatic) {
-            this.currentSize = this.size;
-            // Initialiser les paramètres de flottement pour toutes les particules statiques
+        this.currentSize = this.size;
+
+        // Configurer les paramètres de mouvement uniquement après avoir défini la position
+        if (!this.isStatic) {
+            this.speed = config.particleSpeed * (0.8 + Math.random() * 0.4);
+            this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
+        } else {
+            // Paramètres de flottement uniquement pour les particules statiques
             this.floatSpeed = 0.02 + Math.random() * 0.03;
             this.floatPhase = Math.random() * Math.PI * 2;
             this.floatAmplitude = 0.02 + Math.random() * 0.03;
@@ -745,33 +750,32 @@ class Particle {
         if (!this.isStatic) {
             // Déplacement des particules mobiles
             this.distanceTraveled += this.speed * this.direction;
-            
+        
             // Si la particule a atteint sa distance maximale, la réinitialiser
             if (Math.abs(this.distanceTraveled) > config.maxParticleDistance) {
                 this.resetOuterParticle();
                 return;
             }
-            
+        
             // Calculer la nouvelle position radiale
             const currentRadius = this.radius + this.distanceTraveled;
-            
+        
             // Si la particule va vers l'intérieur et atteint le cercle intérieur, la réinitialiser
             if (this.direction < 0 && currentRadius <= config.innerRadius) {
                 this.resetOuterParticle();
                 return;
             }
-            
+        
             // Mettre à jour la position
             this.x = Math.cos(this.angle) * currentRadius;
             this.z = Math.sin(this.angle) * currentRadius;
-            
+            this.y = 0; // Forcer la position Y à 0 pour éviter tout tremblement vertical
+        
             // Calcul de la taille basé sur la distance parcourue avec une transition plus douce
             const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
             const sizeFactor = Math.max(0, 1 - distanceRatio);
+            this.currentSize = this.size * sizeFactor;
             
-            // Utiliser une courbe plus douce pour la transition de taille
-            const smoothFactor = Math.sin(sizeFactor * Math.PI / 2);
-            this.currentSize = this.size * smoothFactor;
         } else if (this.floatSpeed) { // Vérifier que les paramètres de flottement sont initialisés
             // Effet de flottement pour toutes les particules statiques
             this.floatPhase += this.floatSpeed;

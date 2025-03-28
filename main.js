@@ -658,9 +658,9 @@ class Particle {
             this.originalZ = this.z;
 
             // Initialiser les paramètres de flottement pour toutes les particules statiques
-            this.floatSpeed = 0.04 + Math.random() * 0.05;
+            this.floatSpeed = 0.03 + Math.random() * 0.03;
                 this.floatPhase = Math.random() * Math.PI * 2;
-            this.floatAmplitude = 0.06 + Math.random() * 0.06;
+            this.floatAmplitude = 0.04 + Math.random() * 0.04;
             
             console.log('Paramètres de flottement initialisés dans resetParticle:', {
                 isStatic: this.isStatic,
@@ -696,7 +696,7 @@ class Particle {
             const isInnerBorder = random < config.innerBorderParticleRatio;
             const isOuterBorder = !isInnerBorder && random < (config.innerBorderParticleRatio + config.outerBorderParticleRatio);
             this.isBorder = isInnerBorder || isOuterBorder;
-
+            
             // Définir le rayon et la taille en fonction du type
             if (isInnerBorder) {
                 const randomOffset = (Math.random() - 0.5) * config.innerBorderWidth;
@@ -711,33 +711,32 @@ class Particle {
                 this.radius = config.outerRadius + randomOffset;
                 this.size = config.outerCircleParticleSize;
             }
-
-            // Initialiser ou conserver les paramètres de flottement
-            this.floatSpeed = this.floatSpeed || (0.04 + Math.random() * 0.04);
+            
+            // Initialiser ou conserver les paramètres de flottement avec une amplitude réduite
+            this.floatSpeed = this.floatSpeed || (0.03 + Math.random() * 0.03);
             this.floatPhase = this.floatPhase || Math.random() * Math.PI * 2;
-            this.floatAmplitude = this.floatAmplitude || (0.08 + Math.random() * 0.08);
+            this.floatAmplitude = this.floatAmplitude || (0.04 + Math.random() * 0.04);
             
             // Calculer la position initiale
             this.x = Math.cos(this.angle) * this.radius;
             this.z = Math.sin(this.angle) * this.radius;
             this.y = 0;
             
+            // Maintenir la taille et l'opacité pour les particules statiques
+            this.currentSize = this.size;
+            this.opacity = 1.0;
+            this.active = true;
         } else {
             // C'est une particule mobile
             this.isStatic = false;
             this.isBorder = false;
             this.radius = config.outerRadius;
-            this.size = config.outerCircleParticleSize * 0.4;
-            this.opacity = 0.0;
+            this.size = config.outerCircleParticleSize;
+            this.currentSize = this.size;
             
             // Paramètres de mouvement pour les particules mobiles
             this.speed = config.particleSpeed * (0.2 + Math.random() * 0.3);
             this.direction = Math.random() < config.outerOutwardRatio ? 1 : -1;
-            
-            // Réinitialiser les paramètres de flottement pour les particules mobiles
-            this.floatSpeed = 0;
-            this.floatPhase = 0;
-            this.floatAmplitude = 0;
             
             // Position initiale pour les particules mobiles
             const angle = Math.random() * Math.PI * 2;
@@ -745,11 +744,27 @@ class Particle {
             this.x = Math.cos(angle) * this.radius;
             this.z = Math.sin(angle) * this.radius;
             this.y = 0;
+
+            // Réinitialiser les paramètres de flottement pour les particules mobiles
+            this.floatSpeed = 0;
+            this.floatPhase = 0;
+            this.floatAmplitude = 0;
+            
+            // Réinitialiser complètement l'état de la particule mobile
+            this.distanceTraveled = 0;
+            this.opacity = 0;
+            this.fadeState = 'in';
+            this.fadeProgress = 0;
+            this.active = true;
+
+            // Vérifier immédiatement si la particule dépasse la distance maximale
+            const currentRadius = this.radius + this.distanceTraveled;
+            if (Math.abs(this.distanceTraveled) > config.maxParticleDistance || 
+                (this.direction < 0 && currentRadius <= config.innerRadius)) {
+                this.fadeState = 'out';
+                this.fadeProgress = 1;
+            }
         }
-        
-        this.active = true;
-        this.currentSize = this.size;
-        this.distanceTraveled = 0;
     }
     
     update(deltaTime) {
@@ -763,59 +778,68 @@ class Particle {
         if (!this.isStatic) {
             // Déplacement des particules mobiles
             this.distanceTraveled += this.speed * this.direction;
-        
-            // Si la particule a atteint sa distance maximale, la réinitialiser
-            if (Math.abs(this.distanceTraveled) > config.maxParticleDistance) {
-                this.resetOuterParticle();
-                return;
-            }
-        
-            // Calculer la nouvelle position radiale
+            
+            // Calculer le rayon actuel une seule fois
             const currentRadius = this.radius + this.distanceTraveled;
-        
-            // Si la particule va vers l'intérieur et atteint le cercle intérieur, la réinitialiser
-            if (this.direction < 0 && currentRadius <= config.innerRadius) {
-                this.resetOuterParticle();
-                return;
+            
+            // Vérifier si la particule dépasse la distance maximale
+            if (Math.abs(this.distanceTraveled) > config.maxParticleDistance || 
+                (this.direction < 0 && currentRadius <= config.innerRadius)) {
+                if (this.fadeState !== 'out') {
+                    this.fadeState = 'out';
+                    this.fadeProgress = 1;
+                }
             }
-        
+
+            // Gestion du fade in/out
+            const fadeSpeed = 0.05;
+            
+            if (this.fadeState === 'in') {
+                this.fadeProgress += fadeSpeed;
+                if (this.fadeProgress >= 1) {
+                    this.fadeProgress = 1;
+                    this.fadeState = 'visible';
+                }
+                this.opacity = this.fadeProgress;
+            } else if (this.fadeState === 'out') {
+                this.fadeProgress -= fadeSpeed;
+                if (this.fadeProgress <= 0) {
+                    this.resetOuterParticle();
+                    return;
+                }
+                this.opacity = this.fadeProgress;
+            }
+            
             // Mettre à jour la position de manière strictement radiale
             this.x = Math.cos(this.angle) * currentRadius;
             this.z = Math.sin(this.angle) * currentRadius;
             this.y = 0;
-        
+            
             // Calcul de la taille basé sur la distance parcourue
             const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
-            const sizeFactor = Math.max(0, 1 - distanceRatio);
+            const sizeFactor = Math.max(0.4, 1 - distanceRatio);
             this.currentSize = this.size * sizeFactor;
-            
         } else {
-            // Effet de flottement pour TOUTES les particules statiques
-            // S'assurer que les paramètres de flottement sont initialisés
+            // Effet de flottement pour les particules statiques
             if (!this.floatSpeed || !this.floatPhase || !this.floatAmplitude) {
-                this.floatSpeed = 0.04 + Math.random() * 0.04;
+                this.floatSpeed = 0.03 + Math.random() * 0.03;
                 this.floatPhase = Math.random() * Math.PI * 2;
-                this.floatAmplitude = 0.08 + Math.random() * 0.08;
+                this.floatAmplitude = 0.04 + Math.random() * 0.04;
             }
 
-            // Mettre à jour la phase avec deltaTime
             this.floatPhase += this.floatSpeed * deltaTime * 30;
             
-            // Calculer les offsets de flottement avec des fréquences différentes
             const xOffset = Math.sin(this.floatPhase * 0.5) * this.floatAmplitude * 1.2;
             const yOffset = Math.cos(this.floatPhase * 0.7) * this.floatAmplitude * 1.2;
             const zOffset = Math.sin(this.floatPhase * 0.6) * this.floatAmplitude * 1.2;
             
-            // Position de base (position originale sur le cercle)
             const baseX = Math.cos(this.angle) * this.radius;
             const baseZ = Math.sin(this.angle) * this.radius;
             
-            // Appliquer les offsets à la position de base
             this.x = baseX + xOffset;
             this.y = yOffset;
             this.z = baseZ + zOffset;
 
-            // Maintenir une taille et une opacité constantes pour les particules statiques
             this.currentSize = this.size;
             this.opacity = 1.0;
         }
@@ -1001,17 +1025,22 @@ function createParticles() {
         particle.isAdditionalCircle = false;
         particle.additionalCircleIndex = -1;
         
+        // Déterminer si la particule doit être mobile ou statique
         const currentMobileRatio = mobileCount / (staticCount + mobileCount + 1);
-        if (currentMobileRatio < targetMobileRatio) {
-            particle.isStatic = false;
+        const shouldBeMobile = currentMobileRatio < targetMobileRatio;
+        
+        // Définir l'état statique avant resetOuterParticle
+        particle.isStatic = !shouldBeMobile;
+        
+        // Initialiser la particule
+        particle.resetOuterParticle();
+        
+        if (shouldBeMobile) {
             mobileCount++;
         } else {
-            particle.isStatic = Math.random() > targetMobileRatio;
-            if (particle.isStatic) staticCount++;
-            else mobileCount++;
+            staticCount++;
         }
         
-        particle.resetParticle();
         particles.push(particle);
     }
     
@@ -1210,9 +1239,9 @@ function animate() {
             // Effet de flottement pour TOUTES les particules statiques
             // S'assurer que les paramètres de flottement sont initialisés
             if (!particle.floatSpeed || !particle.floatPhase || !particle.floatAmplitude) {
-                particle.floatSpeed = 0.04 + Math.random() * 0.04;
+                particle.floatSpeed = 0.03 + Math.random() * 0.03;
                 particle.floatPhase = Math.random() * Math.PI * 2;
-                particle.floatAmplitude = 0.08 + Math.random() * 0.08;
+                particle.floatAmplitude = 0.04 + Math.random() * 0.04;
             }
 
             // Mettre à jour la phase avec deltaTime

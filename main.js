@@ -58,7 +58,7 @@ const config = {
     // Configuration pour l'animation de division
     splitAnimation: {
         gridSize: 3, // 3x3 grid
-        spacing: 1.25, // Espacement entre les cercles
+        spacing: 1.5, // Espacement entre les cercles
         circleRadius: 0.15, // Rayon plus petit des petits cercles (était 0.2)
         circleFill: 0.9, // Remplissage des petits cercles (0-1)
         transitionDuration: 1.0, // Durée de la transition
@@ -258,14 +258,14 @@ function updateCameraFromScroll() {
     const globalProgress = (scrolled / scrollHeight) * 100;
 
     // Définir les seuils pour les différentes animations
-    const outerCircleStartFade = 35;
-    const outerCircleEndFade = 40;
+    const outerCircleStartFade = 36;
+    const outerCircleEndFade = 38;
     const verticalSpacingStart = 20;
     const verticalSpacingEnd = 60;
     const shrinkStart = 55;
     const shrinkStartClose = 58;
     const shrinkEnd = 70;
-    const innerColorStart = 65;
+    const innerColorStart = 68;
     const innerColorEnd = 70;
     const splitStart = 65;
     const splitEnd = 95;
@@ -338,6 +338,7 @@ function updateCameraFromScroll() {
                         y: particle.originalY,
                         z: particle.originalZ
                     };
+                    particle.originalSize = particle.size;
                 }
 
                 // Déterminer quel progrès utiliser en fonction de la position du cercle
@@ -358,10 +359,23 @@ function updateCameraFromScroll() {
                 particle.originalZ = particle.shrinkStartPosition.z * (1 - currentProgress);
                 particle.originalY = baseY; // Maintenir la position Y pour garder les cercles séparés
                 
+                // Réduire la taille progressivement (jusqu'à 40% de la taille originale)
+                const targetSize = particle.originalSize * 0.2;
+                particle.currentSize = particle.originalSize - (particle.originalSize - targetSize) * currentProgress;
+                
                 // Appliquer les nouvelles positions
                 particle.x = particle.originalX;
                 particle.y = particle.originalY;
                 particle.z = particle.originalZ;
+            } else if (shrinkProgress === 0 && particle.shrinkStartPosition) {
+                // Réinitialiser à la position de départ quand l'animation est terminée
+                particle.originalX = particle.shrinkStartPosition.x;
+                particle.originalZ = particle.shrinkStartPosition.z;
+                particle.originalY = particle.shrinkStartPosition.y;
+                particle.x = particle.originalX;
+                particle.y = particle.originalY;
+                particle.z = particle.originalZ;
+                particle.currentSize = particle.originalSize;
             }
         }
 

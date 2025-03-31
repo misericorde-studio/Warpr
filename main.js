@@ -10,7 +10,7 @@ const config = {
     
     // Paramètres des particules
     innerCircleParticles: 100, // Nombre de particules dans le cercle intérieur
-    outerCircleParticles: 2000, // Nombre de particules dans le cercle extérieur (augmenté)
+    outerCircleParticles: 2100, // Nombre de particules dans le cercle extérieur (augmenté de 100)
     baseParticleSize: 0.45,    // Taille de base des particules (réduite de 0.60)
     outerCircleParticleSize: 0.75,     // Grosses particules pour le cercle principal
     outerCircleBorderParticleSize: 0.75, // Petites particules pour les bordures
@@ -298,6 +298,16 @@ function updateCameraFromScroll() {
     const sizeProgress = Math.min(1, Math.max(0, (globalProgress - sizeStartProgress) / (outerCircleEndFade - sizeStartProgress)));
     const smoothSizeProgress = Math.pow(sizeProgress, 0.5);
     
+    // Calculer la largeur actuelle du cercle
+    const startWidth = config.outerCircleWidth;
+    const endWidth = startWidth * 0.05; // Réduire à 5% de la largeur initiale (était 0.1)
+    const currentWidth = startWidth + (endWidth - startWidth) * smoothSizeProgress;
+    
+    // Calculer le rayon actuel du cercle
+    const startRadius = config.outerRadius;
+    const endRadius = startRadius * 0.6; // Réduire à 60% du rayon initial
+    const currentRadius = startRadius + (endRadius - startRadius) * smoothSizeProgress;
+    
     for (let i = 0; i < colors.count; i++) {
         colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
         opacities.setX(i, opacity);
@@ -311,6 +321,29 @@ function updateCameraFromScroll() {
             const targetSize = originalSize * (1 - smoothSizeProgress);
             outerParticles[i].currentSize = targetSize;
             sizes.setX(i, targetSize);
+            
+            // Ajuster la position des particules pour maintenir la densité
+            if (outerParticles[i].isStatic) {
+                const angle = outerParticles[i].angle;
+                const originalRadius = outerParticles[i].radius;
+                
+                // Calculer le nouveau rayon en fonction de la position relative dans le cercle
+                let newRadius;
+                if (outerParticles[i].isBorder) {
+                    // Pour les particules de bordure
+                    const borderWidth = outerParticles[i].isInnerBorder ? config.innerBorderWidth : config.outerBorderWidth;
+                    const borderOffset = (Math.random() - 0.5) * borderWidth * (1 - smoothSizeProgress);
+                    newRadius = currentRadius + borderOffset;
+                } else {
+                    // Pour les particules normales
+                    const randomOffset = (Math.random() - 0.5) * currentWidth;
+                    newRadius = currentRadius + randomOffset;
+                }
+                
+                // Mettre à jour la position
+                outerParticles[i].x = Math.cos(angle) * newRadius;
+                outerParticles[i].z = Math.sin(angle) * newRadius;
+            }
         }
     }
     
@@ -844,6 +877,19 @@ class Particle {
             const sizeProgress = Math.min(1, Math.max(0, (globalProgress - sizeStartProgress) / (outerCircleEndFade - sizeStartProgress)));
             const smoothSizeProgress = Math.pow(sizeProgress, 0.5);
             
+            // Réduire la distance maximale en fonction de la réduction de taille
+            const maxDistanceFactor = 1 - (smoothSizeProgress * 0.95); // Réduire la distance jusqu'à 5%
+            const currentMaxDistance = config.maxParticleDistance * maxDistanceFactor;
+            
+            // Vérifier si la particule dépasse la distance maximale
+            if (Math.abs(this.distanceTraveled) > currentMaxDistance || 
+                (this.direction < 0 && currentRadius <= config.innerRadius)) {
+                if (this.fadeState !== 'out') {
+                    this.fadeState = 'out';
+                    this.fadeProgress = 1;
+                }
+            }
+            
             // Combiner les deux facteurs de réduction de taille
             const finalSizeFactor = sizeFactor * (1 - smoothSizeProgress);
             this.currentSize = this.size * finalSizeFactor;
@@ -857,9 +903,27 @@ class Particle {
 
             this.floatPhase += this.floatSpeed * deltaTime * 30;
             
-            const xOffset = Math.sin(this.floatPhase * 0.5) * this.floatAmplitude * 1.2;
-            const yOffset = Math.cos(this.floatPhase * 0.7) * this.floatAmplitude * 1.2;
-            const zOffset = Math.sin(this.floatPhase * 0.6) * this.floatAmplitude * 1.2;
+            // Calculer le progrès de la réduction de taille
+            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrolled = window.scrollY;
+            const globalProgress = (scrolled / scrollHeight) * 100;
+            const sizeStartProgress = 20;
+            const outerCircleEndFade = 38;
+            const sizeProgress = Math.min(1, Math.max(0, (globalProgress - sizeStartProgress) / (outerCircleEndFade - sizeStartProgress)));
+            const smoothSizeProgress = Math.pow(sizeProgress, 0.5);
+            
+            // Réduire la distance de flottement en fonction de la réduction de taille
+            const floatDistanceFactor = 1 - (smoothSizeProgress * 0.99); // Réduire la distance jusqu'à 1%
+            const maxFloatDistance = 0.04; // Distance maximale initiale
+            const currentMaxDistance = maxFloatDistance * floatDistanceFactor;
+            
+            // Réduire également l'amplitude du flottement
+            const currentAmplitude = this.floatAmplitude * (1 - (smoothSizeProgress * 0.99));
+            
+            // Calculer les offsets avec la distance réduite
+            const xOffset = Math.sin(this.floatPhase * 0.5) * currentAmplitude * currentMaxDistance;
+            const yOffset = Math.cos(this.floatPhase * 0.7) * currentAmplitude * currentMaxDistance;
+            const zOffset = Math.sin(this.floatPhase * 0.6) * currentAmplitude * currentMaxDistance;
             
             const baseX = Math.cos(this.angle) * this.radius;
             const baseZ = Math.sin(this.angle) * this.radius;

@@ -247,8 +247,14 @@ function updateScroll() {
             particles.rotation.x = 0;
         }
 
-        // Animation du zoom et de la distance max entre 60% et 80%
-        if (animationProgress >= 60 && animationProgress <= 80) {
+        // Gestion du zoom et de la distance max
+        if (animationProgress < 60) {
+            // En dessous de 60%, on force le zoom initial
+            camera.zoom = config.initialZoom;
+            camera.far = config.initialFar;
+            camera.near = Math.max(0.1, config.initialFar * 0.1);
+            camera.updateProjectionMatrix();
+        } else if (animationProgress >= 60 && animationProgress <= 80) {
             const progress = (animationProgress - 60) / 20; // 0 à 1 entre 60% et 80%
             
             // Animation de la distance max
@@ -267,6 +273,12 @@ function updateScroll() {
             }
             camera.zoom = newZoom;
             
+            camera.updateProjectionMatrix();
+        } else {
+            // Au-delà de 80%, on maintient les valeurs finales
+            camera.zoom = config.finalZoom;
+            camera.far = config.finalFar;
+            camera.near = Math.max(0.1, config.finalFar * 0.1);
             camera.updateProjectionMatrix();
         }
 

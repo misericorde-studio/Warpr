@@ -28,7 +28,8 @@ const config = {
     borderParticleCount: 2000, // Nombre de particules dans la bordure
     borderParticleMaxSize: 12.0,  // Taille maximale des particules de la bordure (près du cercle)
     borderParticleMinSize: 4.0,  // Taille minimale des particules de la bordure (loin du cercle)
-    borderColor: 0xFFFFFF    // Couleur de la bordure
+    borderColor: 0xFFFFFF,    // Couleur de la bordure
+    thicknessVariationMultiplier: 3.0, // Multiplicateur pour la variation d'épaisseur
 };
 
 // Variables globales
@@ -144,19 +145,33 @@ function createParticles() {
         const angle = (i / config.particleCount) * Math.PI * 2;
         const progress = i / (config.particleCount - 1);
 
-        // Distribution régulière pour l'épaisseur
-        const radialOffset = ((i % 3) - 1) * lineThickness;
+        // Ajout d'une variation aléatoire à l'angle
+        const angleVariation = (Math.random() - 0.5) * 0.1; // ±0.05 radians de variation
+        const finalAngle = angle + angleVariation;
+
+        // Calcul du rayon de base avec une légère variation
+        const radiusVariation = (Math.random() - 0.5) * 0.1; // ±5% de variation
+        const baseRadius = config.radius * (1 + radiusVariation);
         
-        const baseRadius = config.radius + radialOffset;
-        const x = Math.cos(angle) * baseRadius;
-        const z = Math.sin(angle) * baseRadius;
+        // Calcul de la position de base
+        const x = Math.cos(finalAngle) * baseRadius;
+        const z = Math.sin(finalAngle) * baseRadius;
         
-        let y = 0;
+        // Distribution régulière pour l'épaisseur avec variation sur Y
+        const layerOffset = ((i % 3) - 1);
+        const thicknessVariation = Math.abs(Math.cos(finalAngle)) * config.thicknessVariationMultiplier;
+        const baseThickness = lineThickness * (1 + thicknessVariation);
+        
+        // Ajout d'une variation aléatoire à l'épaisseur
+        const thicknessNoise = (Math.random() - 0.5) * 0.3; // ±15% de variation
+        let y = layerOffset * baseThickness * (1 + thicknessNoise);
+        
+        // Ajout des variations de hauteur
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
             
-            let value = Math.sin(angle * freq + phaseOffsets[phase]);
+            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
             
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
@@ -166,8 +181,8 @@ function createParticles() {
             y += value * amp;
         }
         
-        // Utilisation d'une fonction déterministe au lieu du bruit aléatoire
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
+        // Ajout du bruit avec plus de variation
+        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
         y += noiseValue * heightVariation;
         
         positions[i3] = x;
@@ -411,19 +426,33 @@ function updateParticles() {
         const angle = (i / config.particleCount) * Math.PI * 2;
         const progress = i / (config.particleCount - 1);
 
-        // Distribution régulière pour l'épaisseur
-        const radialOffset = ((i % 3) - 1) * lineThickness;
+        // Ajout d'une variation aléatoire à l'angle
+        const angleVariation = (Math.random() - 0.5) * 0.1;
+        const finalAngle = angle + angleVariation;
+
+        // Calcul du rayon de base avec une légère variation
+        const radiusVariation = (Math.random() - 0.5) * 0.1;
+        const baseRadius = config.radius * (1 + radiusVariation);
         
-        const baseRadius = config.radius + radialOffset;
-        const x = Math.cos(angle) * baseRadius;
-        const z = Math.sin(angle) * baseRadius;
+        // Calcul de la position de base
+        const x = Math.cos(finalAngle) * baseRadius;
+        const z = Math.sin(finalAngle) * baseRadius;
         
-        let y = 0;
+        // Distribution régulière pour l'épaisseur avec variation sur Y
+        const layerOffset = ((i % 3) - 1);
+        const thicknessVariation = Math.abs(Math.cos(finalAngle)) * config.thicknessVariationMultiplier;
+        const baseThickness = lineThickness * (1 + thicknessVariation);
+        
+        // Ajout d'une variation aléatoire à l'épaisseur
+        const thicknessNoise = (Math.random() - 0.5) * 0.3;
+        let y = layerOffset * baseThickness * (1 + thicknessNoise);
+        
+        // Ajout des variations de hauteur
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
             
-            let value = Math.sin(angle * freq + phaseOffsets[phase]);
+            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
             
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
@@ -433,8 +462,8 @@ function updateParticles() {
             y += value * amp;
         }
         
-        // Utilisation d'une fonction déterministe
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
+        // Ajout du bruit avec plus de variation
+        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
         y += noiseValue * heightVariation;
         
         positions[i3] = x;

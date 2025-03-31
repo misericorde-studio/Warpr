@@ -282,28 +282,36 @@ function updateCameraFromScroll() {
     const startColor = new THREE.Color(0xffffff);
     const endColor = new THREE.Color(0x0C0E13);
     const smoothProgress = Math.pow(outerCircleProgress, 0.5);
-        const currentColor = startColor.clone().lerp(endColor, smoothProgress);
-        
-        let opacity = 1.0;
-        if (smoothProgress > 0.95) {
+    const currentColor = startColor.clone().lerp(endColor, smoothProgress);
+    
+    let opacity = 1.0;
+    if (smoothProgress > 0.95) {
         opacity = 1.0 - ((smoothProgress - 0.95) * 20);
-        }
+    }
+    
+    const colors = outerGeometry.attributes.color;
+    const opacities = outerGeometry.attributes.opacity;
+    const sizes = outerGeometry.attributes.size;
+    
+    for (let i = 0; i < colors.count; i++) {
+        colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
+        opacities.setX(i, opacity);
         
-        const colors = outerGeometry.attributes.color;
-        const opacities = outerGeometry.attributes.opacity;
-        
-        for (let i = 0; i < colors.count; i++) {
-            colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
-            opacities.setX(i, opacity);
+        if (outerParticles[i]) {
+            outerParticles[i].color = currentColor;
+            outerParticles[i].opacity = opacity;
             
-            if (outerParticles[i]) {
-                outerParticles[i].color = currentColor;
-                outerParticles[i].opacity = opacity;
-            }
+            // Réduire la taille des particules en fonction du progrès
+            const originalSize = outerParticles[i].size;
+            const targetSize = originalSize * (1 - smoothProgress);
+            outerParticles[i].currentSize = targetSize;
+            sizes.setX(i, targetSize);
         }
-        
-        colors.needsUpdate = true;
-        opacities.needsUpdate = true;
+    }
+    
+    colors.needsUpdate = true;
+    opacities.needsUpdate = true;
+    sizes.needsUpdate = true;
 
     // Animation de l'espacement vertical et de la couleur des cercles intérieurs
     const startSpacing = config.additionalCircleVerticalSpacing;
@@ -815,10 +823,22 @@ class Particle {
             this.z = Math.sin(this.angle) * currentRadius;
             this.y = 0;
             
-            // Calcul de la taille basé sur la distance parcourue
+            // Calcul de la taille basé sur la distance parcourue et le progrès de la transition
             const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
             const sizeFactor = 1 - distanceRatio;
-            this.currentSize = this.size * sizeFactor;
+            
+            // Récupérer le progrès de la transition de couleur du cercle extérieur
+            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrolled = window.scrollY;
+            const globalProgress = (scrolled / scrollHeight) * 100;
+            const outerCircleStartFade = 36;
+            const outerCircleEndFade = 38;
+            const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
+            const smoothProgress = Math.pow(outerCircleProgress, 0.5);
+            
+            // Combiner les deux facteurs de réduction de taille
+            const finalSizeFactor = sizeFactor * (1 - smoothProgress);
+            this.currentSize = this.size * finalSizeFactor;
         } else {
             // Effet de flottement pour les particules statiques
             if (!this.floatSpeed || !this.floatPhase || !this.floatAmplitude) {

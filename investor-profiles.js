@@ -211,6 +211,8 @@ function createParticles() {
     const borderGeometry = new THREE.BufferGeometry();
     const borderPositions = new Float32Array(config.borderParticleCount * 3);
     const borderSizes = new Float32Array(config.borderParticleCount);
+    const initialPositions = new Float32Array(config.borderParticleCount * 3);
+    const finalPositions = new Float32Array(config.borderParticleCount * 3);
 
     for (let i = 0; i < config.borderParticleCount; i++) {
         const i3 = i * 3;
@@ -248,9 +250,20 @@ function createParticles() {
         const offsetY = (Math.random() - 0.5) * config.borderWidth;
         const offsetZ = Math.sin(radialAngle) * radialOffset;
 
-        borderPositions[i3] = baseX + offsetX;
-        borderPositions[i3 + 1] = baseY + offsetY;
-        borderPositions[i3 + 2] = baseZ + offsetZ;
+        // Position initiale (plaquée contre le cercle)
+        initialPositions[i3] = baseX;
+        initialPositions[i3 + 1] = baseY;
+        initialPositions[i3 + 2] = baseZ;
+
+        // Position finale (avec offset)
+        finalPositions[i3] = baseX + offsetX;
+        finalPositions[i3 + 1] = baseY + offsetY;
+        finalPositions[i3 + 2] = baseZ + offsetZ;
+
+        // Position de départ = position initiale
+        borderPositions[i3] = initialPositions[i3];
+        borderPositions[i3 + 1] = initialPositions[i3 + 1];
+        borderPositions[i3 + 2] = initialPositions[i3 + 2];
 
         // Calcul de la taille des particules en fonction de la distance
         const distanceFromBase = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
@@ -260,6 +273,8 @@ function createParticles() {
 
     borderGeometry.setAttribute('position', new THREE.BufferAttribute(borderPositions, 3));
     borderGeometry.setAttribute('size', new THREE.BufferAttribute(borderSizes, 1));
+    borderGeometry.setAttribute('initialPosition', new THREE.BufferAttribute(initialPositions, 3));
+    borderGeometry.setAttribute('finalPosition', new THREE.BufferAttribute(finalPositions, 3));
 
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
@@ -347,6 +362,25 @@ function updateScroll() {
         if (animationProgress > 60) {
             const rotationX = -((animationProgress - 60) / 30) * (90 * Math.PI / 180);
             particles.rotation.x = rotationX;
+
+            // Animation du déploiement des particules de bordure pendant la rotation finale
+            if (borderParticles && borderParticles.geometry) {
+                const positions = borderParticles.geometry.attributes.position.array;
+                const initialPos = borderParticles.geometry.attributes.initialPosition.array;
+                const finalPos = borderParticles.geometry.attributes.finalPosition.array;
+                
+                // Calculer le facteur de déploiement (0 à 1) pendant la rotation finale
+                const deploymentProgress = (animationProgress - 60) / 30;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    // Interpolation entre position initiale et finale
+                    positions[i] = initialPos[i] + (finalPos[i] - initialPos[i]) * deploymentProgress;
+                    positions[i + 1] = initialPos[i + 1] + (finalPos[i + 1] - initialPos[i + 1]) * deploymentProgress;
+                    positions[i + 2] = initialPos[i + 2] + (finalPos[i + 2] - initialPos[i + 2]) * deploymentProgress;
+                }
+                
+                borderParticles.geometry.attributes.position.needsUpdate = true;
+            }
         } else {
             particles.rotation.x = 0;
         }

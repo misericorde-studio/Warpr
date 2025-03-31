@@ -258,8 +258,10 @@ function updateCameraFromScroll() {
     const globalProgress = (scrolled / scrollHeight) * 100;
 
     // Définir les seuils pour les différentes animations
-    const outerCircleStartFade = 20; // Modifié de 36 à 20
-    const outerCircleEndFade = 38;
+    const outerCircleStartFade = 36;  // Début du changement de couleur
+    const outerCircleEndFade = 38;    // Fin du changement de couleur
+    const sizeReductionStart = 20;    // Début de la réduction de taille
+    const sizeReductionEnd = 38;      // Fin de la réduction de taille
     const verticalSpacingStart = 20;
     const verticalSpacingEnd = 60;
     const shrinkStart = 55;
@@ -272,6 +274,7 @@ function updateCameraFromScroll() {
     
     // Calculer les progressions pour chaque animation
     const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
+    const sizeReductionProgress = Math.min(1, Math.max(0, (globalProgress - sizeReductionStart) / (sizeReductionEnd - sizeReductionStart)));
     const verticalSpacingProgress = Math.min(1, Math.max(0, (globalProgress - verticalSpacingStart) / (verticalSpacingEnd - verticalSpacingStart)));
     const shrinkProgress = Math.min(1, Math.max(0, (globalProgress - shrinkStart) / (shrinkEnd - shrinkStart)));
     const shrinkProgressClose = Math.min(1, Math.max(0, (globalProgress - shrinkStartClose) / (shrinkEnd - shrinkStartClose)));
@@ -282,6 +285,7 @@ function updateCameraFromScroll() {
     const startColor = new THREE.Color(0xffffff);
     const endColor = new THREE.Color(0x0C0E13);
     const smoothProgress = Math.pow(outerCircleProgress, 0.5);
+    const smoothSizeProgress = Math.pow(sizeReductionProgress, 0.5);
     const currentColor = startColor.clone().lerp(endColor, smoothProgress);
     
     let opacity = 1.0;
@@ -301,9 +305,9 @@ function updateCameraFromScroll() {
             outerParticles[i].color = currentColor;
             outerParticles[i].opacity = opacity;
             
-            // Réduire la taille des particules en fonction du progrès
+            // Réduire la taille des particules en fonction du progrès de réduction de taille
             const originalSize = outerParticles[i].size;
-            const targetSize = originalSize * (1 - smoothProgress);
+            const targetSize = originalSize * (1 - smoothSizeProgress);
             outerParticles[i].currentSize = targetSize;
             sizes.setX(i, targetSize);
         }
@@ -827,17 +831,17 @@ class Particle {
             const distanceRatio = Math.abs(this.distanceTraveled) / config.maxParticleDistance;
             const sizeFactor = 1 - distanceRatio;
             
-            // Récupérer le progrès de la transition de couleur du cercle extérieur
+            // Récupérer le progrès de la réduction de taille
             const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
             const scrolled = window.scrollY;
             const globalProgress = (scrolled / scrollHeight) * 100;
-            const outerCircleStartFade = 20; // Modifié de 36 à 20
-            const outerCircleEndFade = 38;
-            const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
-            const smoothProgress = Math.pow(outerCircleProgress, 0.5);
+            const sizeReductionStart = 20;    // Début de la réduction de taille
+            const sizeReductionEnd = 38;      // Fin de la réduction de taille
+            const sizeReductionProgress = Math.min(1, Math.max(0, (globalProgress - sizeReductionStart) / (sizeReductionEnd - sizeReductionStart)));
+            const smoothSizeProgress = Math.pow(sizeReductionProgress, 0.5);
             
             // Combiner les deux facteurs de réduction de taille
-            const finalSizeFactor = sizeFactor * (1 - smoothProgress);
+            const finalSizeFactor = sizeFactor * (1 - smoothSizeProgress);
             this.currentSize = this.size * finalSizeFactor;
         } else {
             // Effet de flottement pour les particules statiques

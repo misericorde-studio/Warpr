@@ -293,6 +293,11 @@ function updateCameraFromScroll() {
     const opacities = outerGeometry.attributes.opacity;
     const sizes = outerGeometry.attributes.size;
     
+    // Calculer le progrès de la réduction de taille
+    const sizeStartProgress = 20; // Début de la réduction à 20%
+    const sizeProgress = Math.min(1, Math.max(0, (globalProgress - sizeStartProgress) / (outerCircleEndFade - sizeStartProgress)));
+    const smoothSizeProgress = Math.pow(sizeProgress, 0.5);
+    
     for (let i = 0; i < colors.count; i++) {
         colors.setXYZ(i, currentColor.r, currentColor.g, currentColor.b);
         opacities.setX(i, opacity);
@@ -303,7 +308,7 @@ function updateCameraFromScroll() {
             
             // Réduire la taille des particules en fonction du progrès
             const originalSize = outerParticles[i].size;
-            const targetSize = originalSize * (1 - smoothProgress);
+            const targetSize = originalSize * (1 - smoothSizeProgress);
             outerParticles[i].currentSize = targetSize;
             sizes.setX(i, targetSize);
         }
@@ -833,11 +838,14 @@ class Particle {
             const globalProgress = (scrolled / scrollHeight) * 100;
             const outerCircleStartFade = 36;
             const outerCircleEndFade = 38;
-            const outerCircleProgress = Math.min(1, Math.max(0, (globalProgress - outerCircleStartFade) / (outerCircleEndFade - outerCircleStartFade)));
-            const smoothProgress = Math.pow(outerCircleProgress, 0.5);
+            const sizeStartProgress = 20; // Début de la réduction à 20%
+            
+            // Calculer le progrès de la réduction de taille
+            const sizeProgress = Math.min(1, Math.max(0, (globalProgress - sizeStartProgress) / (outerCircleEndFade - sizeStartProgress)));
+            const smoothSizeProgress = Math.pow(sizeProgress, 0.5);
             
             // Combiner les deux facteurs de réduction de taille
-            const finalSizeFactor = sizeFactor * (1 - smoothProgress);
+            const finalSizeFactor = sizeFactor * (1 - smoothSizeProgress);
             this.currentSize = this.size * finalSizeFactor;
         } else {
             // Effet de flottement pour les particules statiques

@@ -22,12 +22,18 @@ const config = {
     cameraNear: 1,
     cameraFar: 3,
     initialFar: 3,
-    finalFar: 4.5
+    finalFar: 4.5,
+    // Configuration de la bordure
+    borderWidth: 0.4,        // Largeur de la bordure
+    borderParticleCount: 2000, // Nombre de particules dans la bordure
+    borderParticleMaxSize: 12.0,  // Taille maximale des particules de la bordure (près du cercle)
+    borderParticleMinSize: 4.0,  // Taille minimale des particules de la bordure (loin du cercle)
+    borderColor: 0xFFFFFF    // Couleur de la bordure
 };
 
 // Variables globales
 let scene, camera, renderer, controls;
-let particles;
+let particles, borderParticles;
 let clock;
 let container;
 let heightVariation = 0.2;
@@ -116,10 +122,11 @@ function lerp(a, b, t) {
 
 // Création des particules
 function createParticles() {
+    // Création des particules principales
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(config.particleCount * 3);
 
-    // Valeurs fixes au lieu de valeurs aléatoires
+    // Valeurs fixes pour la continuité
     const phaseOffsets = [0, Math.PI/4, Math.PI/2, Math.PI*3/4, Math.PI, Math.PI*5/4, Math.PI*3/2, Math.PI*7/4];
     const frequencyMultipliers = [1, 0.5, 0.75, 0.25, 0.6, 0.35, 0.8, 0.45];
     const amplitudeMultipliers = [1, 0.8, 0.6, 0.4, 0.7, 0.5, 0.9, 0.3];
@@ -184,6 +191,88 @@ function createParticles() {
 
     particles = new THREE.Points(geometry, material);
     scene.add(particles);
+
+    // Création des particules de la bordure
+    const borderGeometry = new THREE.BufferGeometry();
+    const borderPositions = new Float32Array(config.borderParticleCount * 3);
+    const borderSizes = new Float32Array(config.borderParticleCount);
+
+    for (let i = 0; i < config.borderParticleCount; i++) {
+        const i3 = i * 3;
+        const angle = (i / config.borderParticleCount) * Math.PI * 2;
+        const progress = i / (config.borderParticleCount - 1);
+
+        // Distribution radiale autour des particules principales
+        const radialAngle = Math.random() * Math.PI * 2;
+        const radialOffset = Math.random() * config.borderWidth;
+        
+        // Calcul de la position de base
+        let baseY = 0;
+        for (let phase = 0; phase < config.curvePhases; phase++) {
+            const freq = config.curveFrequency * frequencyMultipliers[phase];
+            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            
+            let value = Math.sin(angle * freq + phaseOffsets[phase]);
+            
+            if (progress > 0.95) {
+                const blend = (progress - 0.95) / 0.05;
+                value = value * (1 - blend) + startValues[phase] * blend;
+            }
+            
+            baseY += value * amp;
+        }
+
+        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
+        baseY += noiseValue * heightVariation;
+
+        const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
+        const baseX = Math.cos(angle) * baseRadius;
+        const baseZ = Math.sin(angle) * baseRadius;
+
+        const offsetX = Math.cos(radialAngle) * radialOffset;
+        const offsetY = (Math.random() - 0.5) * config.borderWidth;
+        const offsetZ = Math.sin(radialAngle) * radialOffset;
+
+        borderPositions[i3] = baseX + offsetX;
+        borderPositions[i3 + 1] = baseY + offsetY;
+        borderPositions[i3 + 2] = baseZ + offsetZ;
+
+        // Calcul de la taille des particules en fonction de la distance
+        const distanceFromBase = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
+        const normalizedDistance = Math.min(distanceFromBase / config.borderWidth, 1);
+        borderSizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
+    }
+
+    borderGeometry.setAttribute('position', new THREE.BufferAttribute(borderPositions, 3));
+    borderGeometry.setAttribute('size', new THREE.BufferAttribute(borderSizes, 1));
+
+    const borderMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            color: { value: new THREE.Color(config.borderColor) },
+            pointTexture: { value: createParticleTexture() }
+        },
+        vertexShader: `
+            attribute float size;
+            void main() {
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = size;
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 color;
+            uniform sampler2D pointTexture;
+            void main() {
+                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * texture2D(pointTexture, gl_PointCoord);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.NormalBlending
+    });
+
+    borderParticles = new THREE.Points(borderGeometry, borderMaterial);
+    scene.add(borderParticles);
 }
 
 function createParticleTexture() {
@@ -284,6 +373,11 @@ function updateScroll() {
 
         // S'assurer que le point de pivot reste au centre
         particles.position.set(0, 0, 0);
+
+        // Appliquer les mêmes rotations à la bordure
+        if (borderParticles) {
+            borderParticles.rotation.copy(particles.rotation);
+        }
     }
 }
 
@@ -349,6 +443,59 @@ function updateParticles() {
     }
 
     geometry.attributes.position.needsUpdate = true;
+
+    // Mise à jour des positions des particules de la bordure
+    if (borderParticles) {
+        const borderPositions = borderParticles.geometry.attributes.position.array;
+        const borderSizes = borderParticles.geometry.attributes.size.array;
+        
+        for (let i = 0; i < config.borderParticleCount; i++) {
+            const i3 = i * 3;
+            const angle = (i / config.borderParticleCount) * Math.PI * 2;
+            const progress = i / (config.borderParticleCount - 1);
+
+            const radialAngle = Math.random() * Math.PI * 2;
+            const radialOffset = Math.random() * config.borderWidth;
+            
+            let baseY = 0;
+            for (let phase = 0; phase < config.curvePhases; phase++) {
+                const freq = config.curveFrequency * frequencyMultipliers[phase];
+                const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+                
+                let value = Math.sin(angle * freq + phaseOffsets[phase]);
+                
+                if (progress > 0.95) {
+                    const blend = (progress - 0.95) / 0.05;
+                    value = value * (1 - blend) + startValues[phase] * blend;
+                }
+                
+                baseY += value * amp;
+            }
+
+            const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
+            baseY += noiseValue * heightVariation;
+
+            const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
+            const baseX = Math.cos(angle) * baseRadius;
+            const baseZ = Math.sin(angle) * baseRadius;
+
+            const offsetX = Math.cos(radialAngle) * radialOffset;
+            const offsetY = (Math.random() - 0.5) * config.borderWidth;
+            const offsetZ = Math.sin(radialAngle) * radialOffset;
+
+            borderPositions[i3] = baseX + offsetX;
+            borderPositions[i3 + 1] = baseY + offsetY;
+            borderPositions[i3 + 2] = baseZ + offsetZ;
+
+            // Mise à jour de la taille des particules
+            const distanceFromBase = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
+            const normalizedDistance = Math.min(distanceFromBase / config.borderWidth, 1);
+            borderSizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
+        }
+        
+        borderParticles.geometry.attributes.position.needsUpdate = true;
+        borderParticles.geometry.attributes.size.needsUpdate = true;
+    }
 }
 
 // Gestionnaires d'événements pour les contrôles

@@ -16,13 +16,13 @@ const config = {
     particleGlowIntensity: 1.0,
     particleGlowRadius: 0.25,
     particleGlowColor: 0x4FFFC1,
-    cameraDistance: 3,
-    cameraZoom: 0.8,
-    initialZoom: 1.6, // Zoom initial (plus proche)
-    finalZoom: 0.8,   // Zoom final (actuel)
-    cameraNear: 0.1,
-    cameraFar: 1000,
-    lineThickness: 1.04
+    cameraDistance: -3,
+    initialZoom: 1.6,
+    finalZoom: 0.8,
+    cameraNear: 1,
+    cameraFar: 3,
+    initialFar: 3,
+    finalFar: 4.5
 };
 
 // Variables globales
@@ -32,6 +32,7 @@ let clock;
 let container;
 let heightVariation = 0.2;
 let lineThickness = 0.04;
+let lastScrollY = 0; // Pour tracker la direction du scroll
 
 // Initialisation
 function init() {
@@ -58,7 +59,7 @@ function init() {
         config.cameraFar
     );
 
-    // Positionnement initial de la caméra avec zoom initial
+    // Positionnement initial de la caméra du côté négatif
     camera.position.set(0, 0, config.cameraDistance);
     camera.lookAt(0, 0, 0);
     camera.zoom = config.initialZoom;
@@ -87,6 +88,9 @@ function init() {
     // Événements
     window.addEventListener('resize', onWindowResize, false);
     window.addEventListener('scroll', updateScroll, false);
+
+    // Ajout de l'initialisation des contrôles
+    setupControls();
 
     // Animation
     animate();
@@ -223,29 +227,48 @@ function onWindowResize() {
 function updateScroll() {
     const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
     const scrolled = window.scrollY;
-    const scrollProgress = Math.min(90, Math.max(0, (scrolled / scrollHeight) * 100));
+    const scrollProgress = Math.min(100, Math.max(0, (scrolled / scrollHeight) * 100));
+    const animationProgress = Math.min(90, scrollProgress);
+    
+    // Déterminer la direction du scroll
+    const scrollingUp = scrolled < lastScrollY;
+    lastScrollY = scrolled;
 
     if (particles) {
-        // Rotation Y de 0° à -40° entre 0% et 60% de scroll (sens inverse)
-        if (scrollProgress <= 60) {
-            const rotationY = ((60 - scrollProgress) / 60) * (40 * Math.PI / 180) - (40 * Math.PI / 180);
-            particles.rotation.x = 0;
-            particles.rotation.y = rotationY;
-        }
-        // Rotation X de 0° à 90° entre 60% et 90% de scroll
-        else {
-            const rotationX = ((scrollProgress - 60) / 30) * (90 * Math.PI / 180);
-            particles.rotation.y = -(40 * Math.PI / 180); // Maintient la rotation Y à -40°
+        // Rotation Y continue de 0° à -180° sur toute la durée du scroll (jusqu'à 100%)
+        const rotationY = -(scrollProgress / 100) * (180 * Math.PI / 180);
+        particles.rotation.y = rotationY;
+
+        // Rotation X de 0° à -90° entre 60% et 90% de scroll (sens inverse)
+        if (animationProgress > 60) {
+            const rotationX = -((animationProgress - 60) / 30) * (90 * Math.PI / 180);
             particles.rotation.x = rotationX;
+        } else {
+            particles.rotation.x = 0;
         }
 
-        // Calcul du zoom progressif
-        const zoomProgress = Math.min(1, scrollProgress / 90);
-        const currentZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
-        
-        // Application du zoom à la caméra
-        camera.zoom = currentZoom;
-        camera.updateProjectionMatrix();
+        // Animation du zoom et de la distance max entre 60% et 80%
+        if (animationProgress >= 60 && animationProgress <= 80) {
+            const progress = (animationProgress - 60) / 20; // 0 à 1 entre 60% et 80%
+            
+            // Animation de la distance max
+            const newFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
+            camera.far = newFar;
+            camera.near = Math.max(0.1, newFar * 0.1);
+            
+            // Animation du zoom avec direction
+            let newZoom;
+            if (scrollingUp) {
+                // En remontant : de finalZoom vers initialZoom
+                newZoom = config.finalZoom + (config.initialZoom - config.finalZoom) * (1 - progress);
+            } else {
+                // En descendant : de initialZoom vers finalZoom
+                newZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
+            }
+            camera.zoom = newZoom;
+            
+            camera.updateProjectionMatrix();
+        }
 
         // S'assurer que le point de pivot reste au centre
         particles.position.set(0, 0, 0);
@@ -322,6 +345,8 @@ function setupControls() {
     const heightValue = document.getElementById('height-value');
     const thicknessControl = document.getElementById('circle-thickness');
     const thicknessValue = document.getElementById('thickness-value');
+    const distanceControl = document.getElementById('camera-distance');
+    const distanceValue = document.getElementById('distance-value');
 
     heightControl.addEventListener('input', (e) => {
         heightVariation = parseFloat(e.target.value);
@@ -333,6 +358,16 @@ function setupControls() {
         lineThickness = parseFloat(e.target.value);
         thicknessValue.textContent = lineThickness.toFixed(3);
         updateParticles();
+    });
+
+    distanceControl.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        config.initialFar = value;
+        config.cameraFar = value;
+        distanceValue.textContent = value.toFixed(1);
+        camera.far = value;
+        camera.near = Math.max(0.1, value * 0.1);
+        camera.updateProjectionMatrix();
     });
 }
 

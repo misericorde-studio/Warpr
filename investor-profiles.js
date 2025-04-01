@@ -20,8 +20,8 @@ const config = {
     initialZoom: 1.6,
     finalZoom: 0.8,
     cameraNear: 1,
-    cameraFar: 3,
-    initialFar: 3,
+    cameraFar: 2.2,
+    initialFar: 2.2,
     finalFar: 4.5,
     greenThreshold: 0.01,  // Retour à la valeur initiale originale
     // Configuration de la bordure
@@ -643,14 +643,14 @@ function updateScroll() {
         }
 
         // Gestion du zoom et de la distance max
-        if (animationProgress < 60) {
-            // En dessous de 60%, on force le zoom initial
+        if (animationProgress < 40) {  // Modifié de 60% à 40%
+            // En dessous de 40%, on force le zoom initial
             camera.zoom = config.initialZoom;
             camera.far = config.initialFar;
             camera.near = Math.max(0.1, config.initialFar * 0.1);
             camera.updateProjectionMatrix();
-        } else if (animationProgress >= 60 && animationProgress <= 80) {
-            const progress = (animationProgress - 60) / 20; // 0 à 1 entre 60% et 80%
+        } else if (animationProgress >= 40 && animationProgress <= 80) {  // Modifié de 60-80% à 40-80%
+            const progress = (animationProgress - 40) / 40;  // 0 à 1 entre 40% et 80% (modifié de 60-80% à 40-80%)
             
             // Animation de la distance max
             const newFar = config.initialFar + (config.finalFar - config.initialFar) * progress;

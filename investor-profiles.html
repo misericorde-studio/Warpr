@@ -239,14 +239,15 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            background: rgba(11, 14, 19, 0.9);
+            background: rgba(11, 14, 19, 0.95);
             padding: 20px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
             font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif;
             z-index: 1000;
-            display: none;
+            backdrop-filter: blur(10px);
+            min-width: 300px;
         }
 
         .control-group {
@@ -258,21 +259,42 @@
             font-size: 0.625rem;
             text-transform: uppercase;
             margin-bottom: 5px;
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .control-group input[type="range"] {
             width: 200px;
             margin-right: 10px;
+            accent-color: #00FEA5;
         }
 
         .control-value {
             font-size: 0.625rem;
             color: #00FEA5;
+            min-width: 40px;
+            display: inline-block;
         }
 
         .slider-container {
             display: flex;
             align-items: center;
+        }
+
+        #toggle-controls, #show-controls {
+            background: #00FEA5;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            color: #0B0E13;
+            font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif;
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #toggle-controls:hover, #show-controls:hover {
+            background: #4FFFC1;
         }
     </style>
 </head>
@@ -323,37 +345,62 @@
                     <p class="pill">003</p>
                     <h2>Burn Points<br>for</h2>
                 </div>
-                <p>Investing in WARPR's various strategic and narrative driven funds means positioning yourself at the forefront of financial innovation. Just as index funds transformed traditional investing by providing easy access and diversification, WARPR aims to do the same for the crypto market.
-                </br>
-                </br>
-                By investing today, you become part of a movement with immense potential for growth, capturing the dynamic shifts and opportunities within the digital asset space. Don't just witness the future of finance—own a piece of it.</p>
+                <p>- Airdrop of [cǒ̵̠̄r̸͎͔͐rụ̶̬̉p̴̱̑̿t̷͉̤̑é̶̞ḋ̶̯ ̸͔̔d̷̘͊a̵̲̪̾t̴͙͒a̴̰̍]</br>
+                    - Degenerately engineered physical goods</br>
+                    - Whitelists and allocations in partnered projects</br>
+                    - Treasure like the One Piece (it's real)</p>
             </div>
         </div>
     </div>
 
     <div id="controls-panel">
         <div class="control-group">
-            <label for="height-variation">Variation de hauteur</label>
+            <label for="curve-count">Nombre de courbes</label>
             <div class="slider-container">
-                <input type="range" id="height-variation" min="0.1" max="1" step="0.05" value="0.4">
-                <span class="control-value" id="height-value">0.4</span>
+                <input type="range" id="curve-count" min="2" max="16" step="1" value="12">
+                <span class="control-value" id="curve-count-value">12</span>
             </div>
         </div>
         <div class="control-group">
-            <label for="circle-thickness">Épaisseur du cercle</label>
+            <label for="particle-size">Taille des particules</label>
             <div class="slider-container">
-                <input type="range" id="circle-thickness" min="0.02" max="0.1" step="0.005" value="0.05">
-                <span class="control-value" id="thickness-value">0.05</span>
+                <input type="range" id="particle-size" min="4" max="16" step="0.1" value="8.06">
+                <span class="control-value" id="particle-size-value">8.06</span>
             </div>
         </div>
         <div class="control-group">
-            <label for="camera-distance">Distance maximale d'affichage</label>
+            <label for="particle-count">Nombre de particules</label>
             <div class="slider-container">
-                <input type="range" id="camera-distance" min="2" max="20" step="0.1" value="10">
-                <span class="control-value" id="distance-value">10.0</span>
+                <input type="range" id="particle-count" min="1000" max="5000" step="100" value="2000">
+                <span class="control-value" id="particle-count-value">2000</span>
             </div>
+        </div>
+        <div class="control-group">
+            <label for="curve-amplitude">Amplitude des courbes</label>
+            <div class="slider-container">
+                <input type="range" id="curve-amplitude" min="0.05" max="0.5" step="0.01" value="0.18">
+                <span class="control-value" id="curve-amplitude-value">0.18</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <label for="max-thickness">Épaisseur max sur Y</label>
+            <div class="slider-container">
+                <input type="range" id="max-thickness" min="0.02" max="0.1" step="0.005" value="0.04">
+                <span class="control-value" id="max-thickness-value">0.04</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <label for="min-thickness">Épaisseur min sur Y</label>
+            <div class="slider-container">
+                <input type="range" id="min-thickness" min="0.005" max="0.05" step="0.005" value="0.02">
+                <span class="control-value" id="min-thickness-value">0.02</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <button id="toggle-controls">Masquer les contrôles</button>
         </div>
     </div>
+    <button id="show-controls" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;">Afficher les contrôles</button>
 
     <script type="importmap">
         {

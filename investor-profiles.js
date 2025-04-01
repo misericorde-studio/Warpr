@@ -4,11 +4,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Configuration
 const config = {
     radius: 1.5,
-    particleCount: 1000,
-    particleSize: 8.06,
+    particleCount: 2600,
+    particleSize: 6.70,
     curveAmplitude: 0.4,
-    curveFrequency: 16,
-    curvePhases: 5,
+    curveFrequency: 9,
+    curvePhases: 4,
     noiseScale: 0.8,
     noisePower: 1.2,
     backgroundColor: 0x0B0E13,
@@ -29,13 +29,13 @@ const config = {
     borderParticleMaxSize: 12.0,  // Taille maximale des particules de la bordure (près du cercle)
     borderParticleMinSize: 4.0,  // Taille minimale des particules de la bordure (loin du cercle)
     borderColor: 0xFFFFFF,    // Couleur de la bordure
-    thicknessVariationMultiplier: 3.0, // Multiplicateur pour la variation d'épaisseur
+    thicknessVariationMultiplier: 5.0, // Augmenté de 3.0 à 5.0 pour plus de variation d'épaisseur
 };
 
 // Valeurs fixes pour les courbes
-const phaseOffsets = [0, Math.PI/3, Math.PI*2/3, Math.PI, Math.PI*4/3];
-const frequencyMultipliers = [1, 0.6, 0.3, 0.8, 0.5];
-const amplitudeMultipliers = [1, 0.8, 0.6, 0.7, 0.5];
+const phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
+const frequencyMultipliers = [1, 0.5, 0.7, 0.3];
+const amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 
 // Variables globales
 let scene, camera, renderer, controls;
@@ -43,8 +43,8 @@ let axesScene, axesCamera;
 let particles, borderParticles;
 let clock;
 let container;
-let heightVariation = 0.2;
-let lineThickness = 0.04;
+let heightVariation = 0.22;
+let lineThickness = 0.030;
 let lastScrollY = 0;
 let axesHelper;
 let axesInitialized = false;
@@ -189,6 +189,8 @@ function createParticles() {
     // Création des particules principales
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(config.particleCount * 3);
+    const mainInitialPositions = new Float32Array(config.particleCount * 3);
+    const mainFinalPositions = new Float32Array(config.particleCount * 3);
 
     // Valeurs fixes pour la continuité
     const startValues = new Float32Array(config.curvePhases);
@@ -203,52 +205,67 @@ function createParticles() {
         const angle = (i / config.particleCount) * Math.PI * 2;
         const progress = i / (config.particleCount - 1);
 
-        // Ajout d'une variation aléatoire à l'angle
-        const angleVariation = (Math.random() - 0.5) * 0.1; // ±0.05 radians de variation
+        const angleVariation = (Math.random() - 0.5) * 0.1;
         const finalAngle = angle + angleVariation;
+        
+        // Distribution radiale plus aléatoire
+        const randomFactor = Math.random();
+        const layerOffset = (randomFactor - 0.5) * 2; // Valeur entre -1 et 1
+        
+        // État initial : toutes les particules sur le cercle de base
+        const initialRadius = config.radius;
+        
+        // État final : variation radiale vers l'intérieur/extérieur
+        const finalRadius = config.radius + (layerOffset * 0.04);
 
-        // Calcul du rayon de base avec une légère variation
-        const radiusVariation = (Math.random() - 0.5) * 0.1; // ±5% de variation
-        const baseRadius = config.radius * (1 + radiusVariation);
-        
-        // Calcul de la position de base
-        const x = Math.cos(finalAngle) * baseRadius;
-        const z = Math.sin(finalAngle) * baseRadius;
-        
-        // Distribution régulière pour l'épaisseur avec variation sur Y
-        const layerOffset = ((i % 3) - 1);
-        const thicknessVariation = Math.abs(Math.cos(finalAngle)) * config.thicknessVariationMultiplier;
+        // Positions initiales (toutes sur le cercle de base)
+        const initialX = Math.cos(finalAngle) * initialRadius;
+        const initialZ = Math.sin(finalAngle) * initialRadius;
+
+        // Positions finales (déployées radialement)
+        const finalX = Math.cos(finalAngle) * finalRadius;
+        const finalZ = Math.sin(finalAngle) * finalRadius;
+
+        // Calcul de la hauteur Y avec distribution aléatoire
+        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
         const baseThickness = lineThickness * (1 + thicknessVariation);
-        
-        // Ajout d'une variation aléatoire à l'épaisseur
-        const thicknessNoise = (Math.random() - 0.5) * 0.3; // ±15% de variation
-        let y = layerOffset * baseThickness * (1 + thicknessNoise);
+        const randomY = (Math.random() * 2 - 1) * baseThickness; // Distribution aléatoire sur Y
+        let y = randomY;
         
         // Ajout des variations de hauteur
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            
             let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
-            
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
                 value = value * (1 - blend) + startValues[phase] * blend;
             }
-            
             y += value * amp;
         }
-        
-        // Ajout du bruit avec plus de variation
-        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
+
+        // Ajout du bruit avec distribution plus naturelle
+        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
         y += noiseValue * heightVariation;
-        
-        positions[i3] = x;
+
+        // Stockage des positions
+        mainInitialPositions[i3] = initialX;
+        mainInitialPositions[i3 + 1] = y;
+        mainInitialPositions[i3 + 2] = initialZ;
+
+        mainFinalPositions[i3] = finalX;
+        mainFinalPositions[i3 + 1] = y;
+        mainFinalPositions[i3 + 2] = finalZ;
+
+        // Position de départ = position initiale
+        positions[i3] = initialX;
         positions[i3 + 1] = y;
-        positions[i3 + 2] = z;
+        positions[i3 + 2] = initialZ;
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('initialPosition', new THREE.BufferAttribute(mainInitialPositions, 3));
+    geometry.setAttribute('finalPosition', new THREE.BufferAttribute(mainFinalPositions, 3));
 
     const material = new THREE.PointsMaterial({
         size: config.particleSize,
@@ -269,8 +286,8 @@ function createParticles() {
     const borderGeometry = new THREE.BufferGeometry();
     const borderPositions = new Float32Array(config.borderParticleCount * 3);
     const borderSizes = new Float32Array(config.borderParticleCount);
-    const initialPositions = new Float32Array(config.borderParticleCount * 3);
-    const finalPositions = new Float32Array(config.borderParticleCount * 3);
+    const borderInitialPositions = new Float32Array(config.borderParticleCount * 3);
+    const borderFinalPositions = new Float32Array(config.borderParticleCount * 3);
 
     for (let i = 0; i < config.borderParticleCount; i++) {
         const i3 = i * 3;
@@ -281,11 +298,11 @@ function createParticles() {
         const radialAngle = Math.random() * Math.PI * 2;
         const radialOffset = Math.random() * config.borderWidth;
         
-        // Calcul de la position Y basée sur les courbes (avec amplitude modérée)
+        // Calcul de la position Y basée sur les courbes (avec amplitude réduite)
         let baseY = 0;
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = (heightVariation * 2.5) * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
             
             let value = Math.sin(angle * freq + phaseOffsets[phase]);
             
@@ -298,11 +315,11 @@ function createParticles() {
         }
 
         // Ajout d'une variation aléatoire supplémentaire sur Y (réduite)
-        baseY += (Math.random() * 2 - 1) * heightVariation * 1.5;
+        baseY += (Math.random() * 2 - 1) * heightVariation;
 
-        // Ajout du bruit avec variation modérée
+        // Ajout du bruit avec variation réduite
         const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
-        baseY += noiseValue * (heightVariation * 2);
+        baseY += noiseValue * (heightVariation * 1.5);
         
         // Calcul de la position de base sur le cercle
         const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
@@ -315,19 +332,19 @@ function createParticles() {
         const offsetZ = Math.sin(radialAngle) * radialOffset;
 
         // Position initiale (plaquée sur le cercle avec Y modérément varié)
-        initialPositions[i3] = baseX;
-        initialPositions[i3 + 1] = baseY;
-        initialPositions[i3 + 2] = baseZ;
+        borderInitialPositions[i3] = baseX;
+        borderInitialPositions[i3 + 1] = baseY;
+        borderInitialPositions[i3 + 2] = baseZ;
 
         // Position finale (avec les offsets)
-        finalPositions[i3] = baseX + offsetX;
-        finalPositions[i3 + 1] = baseY; // Garde la même position Y
-        finalPositions[i3 + 2] = baseZ + offsetZ;
+        borderFinalPositions[i3] = baseX + offsetX;
+        borderFinalPositions[i3 + 1] = baseY; // Garde la même position Y
+        borderFinalPositions[i3 + 2] = baseZ + offsetZ;
 
         // Position de départ = position initiale
-        borderPositions[i3] = initialPositions[i3];
-        borderPositions[i3 + 1] = initialPositions[i3 + 1];
-        borderPositions[i3 + 2] = initialPositions[i3 + 2];
+        borderPositions[i3] = borderInitialPositions[i3];
+        borderPositions[i3 + 1] = borderInitialPositions[i3 + 1];
+        borderPositions[i3 + 2] = borderInitialPositions[i3 + 2];
 
         // Calcul de la taille des particules en fonction de la distance
         const distanceFromBase = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
@@ -337,8 +354,8 @@ function createParticles() {
 
     borderGeometry.setAttribute('position', new THREE.BufferAttribute(borderPositions, 3));
     borderGeometry.setAttribute('size', new THREE.BufferAttribute(borderSizes, 1));
-    borderGeometry.setAttribute('initialPosition', new THREE.BufferAttribute(initialPositions, 3));
-    borderGeometry.setAttribute('finalPosition', new THREE.BufferAttribute(finalPositions, 3));
+    borderGeometry.setAttribute('initialPosition', new THREE.BufferAttribute(borderInitialPositions, 3));
+    borderGeometry.setAttribute('finalPosition', new THREE.BufferAttribute(borderFinalPositions, 3));
 
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
@@ -357,7 +374,7 @@ function createParticles() {
             uniform vec3 color;
             uniform sampler2D pointTexture;
             void main() {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * texture2D(pointTexture, gl_PointCoord);
+                gl_FragColor = vec4(1.0, 1.0, 1.0, 0.0) * texture2D(pointTexture, gl_PointCoord);
             }
         `,
         transparent: true,
@@ -468,26 +485,46 @@ function updateScroll() {
             const rotationX = -((animationProgress - 60) / 30) * (90 * Math.PI / 180);
             particles.rotation.x = rotationX;
 
-            // Animation du déploiement des particules de bordure pendant la rotation finale
+            // Animation de l'épaisseur pendant la rotation finale (60-90%)
+            const deploymentProgress = (animationProgress - 60) / 30;
+            
+            // Animation des particules principales
+            const mainPositions = particles.geometry.attributes.position.array;
+            const mainInitialPos = particles.geometry.attributes.initialPosition.array;
+            const mainFinalPos = particles.geometry.attributes.finalPosition.array;
+            
+            for (let i = 0; i < mainPositions.length; i += 3) {
+                // Interpolation linéaire entre les positions initiales et finales
+                mainPositions[i] = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
+                mainPositions[i + 1] = mainInitialPos[i + 1];
+                mainPositions[i + 2] = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // Animation des particules de bordure
             if (borderParticles && borderParticles.geometry) {
                 const positions = borderParticles.geometry.attributes.position.array;
                 const initialPos = borderParticles.geometry.attributes.initialPosition.array;
                 const finalPos = borderParticles.geometry.attributes.finalPosition.array;
                 
-                // Calculer le facteur de déploiement (0 à 1) pendant la rotation finale
-                const deploymentProgress = (animationProgress - 60) / 30;
-                
                 for (let i = 0; i < positions.length; i += 3) {
-                    // Interpolation entre position initiale et finale
                     positions[i] = initialPos[i] + (finalPos[i] - initialPos[i]) * deploymentProgress;
                     positions[i + 1] = initialPos[i + 1] + (finalPos[i + 1] - initialPos[i + 1]) * deploymentProgress;
                     positions[i + 2] = initialPos[i + 2] + (finalPos[i + 2] - initialPos[i + 2]) * deploymentProgress;
                 }
-                
                 borderParticles.geometry.attributes.position.needsUpdate = true;
             }
         } else {
+            // Réinitialiser la rotation X et les positions si on remonte avant 60%
             particles.rotation.x = 0;
+            
+            const mainPositions = particles.geometry.attributes.position.array;
+            const mainInitialPos = particles.geometry.attributes.initialPosition.array;
+            
+            for (let i = 0; i < mainPositions.length; i++) {
+                mainPositions[i] = mainInitialPos[i];
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
         }
 
         // Gestion du zoom et de la distance max
@@ -566,19 +603,22 @@ function updateParticles() {
         const x = Math.cos(finalAngle) * baseRadius;
         const z = Math.sin(finalAngle) * baseRadius;
         
-        // Distribution régulière pour l'épaisseur avec variation sur Y
-        const layerOffset = ((i % 3) - 1);
-        const thicknessVariation = Math.abs(Math.cos(finalAngle)) * config.thicknessVariationMultiplier;
+        // Distribution plus dense sur Y avec 5 couches au lieu de 3
+        const layerIndex = i % 5; // 5 couches au lieu de 3
+        const layerOffset = (layerIndex - 2) / 2; // Répartition entre -1 et 1
+        
+        // Variation d'épaisseur plus prononcée basée sur l'angle
+        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * config.thicknessVariationMultiplier;
         const baseThickness = lineThickness * (1 + thicknessVariation);
         
         // Ajout d'une variation aléatoire à l'épaisseur
-        const thicknessNoise = (Math.random() - 0.5) * 0.3;
+        const thicknessNoise = (Math.random() - 0.5) * 0.4;
         let y = layerOffset * baseThickness * (1 + thicknessNoise);
         
-        // Ajout des variations de hauteur
+        // Ajout des variations de hauteur avec amplitude réduite
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            const amp = (heightVariation * 0.7) * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
             
             let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
             
@@ -590,9 +630,9 @@ function updateParticles() {
             y += value * amp;
         }
         
-        // Ajout du bruit avec plus de variation
+        // Ajout du bruit avec moins de variation
         const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
-        y += noiseValue * heightVariation;
+        y += noiseValue * (heightVariation * 0.7);
         
         positions[i3] = x;
         positions[i3 + 1] = y;
@@ -657,33 +697,77 @@ function updateParticles() {
 
 // Gestionnaires d'événements pour les contrôles
 function setupControls() {
-    const heightControl = document.getElementById('height-variation');
-    const heightValue = document.getElementById('height-value');
-    const thicknessControl = document.getElementById('circle-thickness');
-    const thicknessValue = document.getElementById('thickness-value');
-    const distanceControl = document.getElementById('camera-distance');
-    const distanceValue = document.getElementById('distance-value');
+    // Récupération des éléments de contrôle
+    const curveCountControl = document.getElementById('curve-count');
+    const curveCountValue = document.getElementById('curve-count-value');
+    const particleSizeControl = document.getElementById('particle-size');
+    const particleSizeValue = document.getElementById('particle-size-value');
+    const particleCountControl = document.getElementById('particle-count');
+    const particleCountValue = document.getElementById('particle-count-value');
+    const curveAmplitudeControl = document.getElementById('curve-amplitude');
+    const curveAmplitudeValue = document.getElementById('curve-amplitude-value');
+    const maxThicknessControl = document.getElementById('max-thickness');
+    const maxThicknessValue = document.getElementById('max-thickness-value');
+    const minThicknessControl = document.getElementById('min-thickness');
+    const minThicknessValue = document.getElementById('min-thickness-value');
+    const toggleControlsBtn = document.getElementById('toggle-controls');
+    const showControlsBtn = document.getElementById('show-controls');
+    const controlsPanel = document.getElementById('controls-panel');
 
-    heightControl.addEventListener('input', (e) => {
+    // Gestion de l'affichage/masquage du panneau de contrôle
+    toggleControlsBtn.addEventListener('click', () => {
+        controlsPanel.style.display = 'none';
+        showControlsBtn.style.display = 'block';
+    });
+
+    showControlsBtn.addEventListener('click', () => {
+        controlsPanel.style.display = 'block';
+        showControlsBtn.style.display = 'none';
+    });
+
+    // Gestionnaires d'événements pour les contrôles
+    curveCountControl.addEventListener('input', (e) => {
+        config.curveFrequency = parseInt(e.target.value);
+        curveCountValue.textContent = config.curveFrequency;
+        updateParticles();
+    });
+
+    particleSizeControl.addEventListener('input', (e) => {
+        config.particleSize = parseFloat(e.target.value);
+        particleSizeValue.textContent = config.particleSize.toFixed(2);
+        if (particles) {
+            particles.material.size = config.particleSize;
+        }
+    });
+
+    particleCountControl.addEventListener('input', (e) => {
+        config.particleCount = parseInt(e.target.value);
+        particleCountValue.textContent = config.particleCount;
+        // Recréer les particules avec le nouveau compte
+        if (particles) {
+            scene.remove(particles);
+            createParticles();
+        }
+    });
+
+    curveAmplitudeControl.addEventListener('input', (e) => {
         heightVariation = parseFloat(e.target.value);
-        heightValue.textContent = heightVariation.toFixed(2);
+        curveAmplitudeValue.textContent = heightVariation.toFixed(2);
         updateParticles();
     });
 
-    thicknessControl.addEventListener('input', (e) => {
+    maxThicknessControl.addEventListener('input', (e) => {
         lineThickness = parseFloat(e.target.value);
-        thicknessValue.textContent = lineThickness.toFixed(3);
+        maxThicknessValue.textContent = lineThickness.toFixed(3);
         updateParticles();
     });
 
-    distanceControl.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        config.initialFar = value;
-        config.cameraFar = value;
-        distanceValue.textContent = value.toFixed(1);
-        camera.far = value;
-        camera.near = Math.max(0.1, value * 0.1);
-        camera.updateProjectionMatrix();
+    minThicknessControl.addEventListener('input', (e) => {
+        const minThickness = parseFloat(e.target.value);
+        minThicknessValue.textContent = minThickness.toFixed(3);
+        // Mettre à jour la configuration avec la nouvelle épaisseur minimale
+        config.borderParticleMinSize = minThickness * 100;
+        updateParticles();
     });
 }
 

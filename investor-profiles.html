@@ -296,6 +296,11 @@
         #toggle-controls:hover, #show-controls:hover {
             background: #4FFFC1;
         }
+
+        #show-controls:hover {
+            background: rgba(0, 254, 165, 0.3);
+            border-color: rgba(0, 254, 165, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -353,7 +358,7 @@
         </div>
     </div>
 
-    <div id="controls-panel">
+    <div id="controls-panel" style="display: none;">
         <div class="control-group">
             <label for="curve-count">Nombre de courbes</label>
             <div class="slider-container">
@@ -400,7 +405,7 @@
             <button id="toggle-controls">Masquer les contrôles</button>
         </div>
     </div>
-    <button id="show-controls" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;">Afficher les contrôles</button>
+    <button id="show-controls" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: rgba(0, 254, 165, 0.2); border: 1px solid rgba(0, 254, 165, 0.3); padding: 8px 12px; border-radius: 4px; color: #00FEA5; font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif; font-size: 0.625rem; text-transform: uppercase; cursor: pointer; backdrop-filter: blur(10px); transition: all 0.3s ease;">Paramètres</button>
 
     <script type="importmap">
         {

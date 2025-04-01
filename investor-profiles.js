@@ -39,15 +39,30 @@ const amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 
 // Variables globales
 let scene, camera, renderer, controls;
-let axesScene, axesCamera;
 let particles, borderParticles;
 let clock;
 let container;
 let heightVariation = 0.22;
 let lineThickness = 0.030;
 let lastScrollY = 0;
-let axesHelper;
-let axesInitialized = false;
+
+// Fonction de bruit 1D simplifiée
+function noise1D(x) {
+    const X = Math.floor(x) & 255;
+    x -= Math.floor(x);
+    const fadeX = x * x * (3 - 2 * x);
+    
+    // Utilisation de fonctions trigonométriques pour générer des valeurs pseudo-aléatoires
+    const h1 = Math.sin(X * 12.9898) * 43758.5453123;
+    const h2 = Math.sin((X + 1) * 12.9898) * 43758.5453123;
+    
+    return lerp(h1 - Math.floor(h1), h2 - Math.floor(h2), fadeX);
+}
+
+// Interpolation linéaire
+function lerp(a, b, t) {
+    return a + t * (b - a);
+}
 
 // Initialisation
 function init() {
@@ -89,9 +104,6 @@ function init() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
     
-    // Initialisation de la scène des axes
-    initAxesHelper();
-
     // Horloge
     clock = new THREE.Clock();
 
@@ -114,74 +126,15 @@ function init() {
     animate();
 }
 
-// Initialisation du helper des axes
-function initAxesHelper() {
-    // Création de la scène des axes
-    axesScene = new THREE.Scene();
+// Animation
+function animate() {
+    requestAnimationFrame(animate);
+    const deltaTime = clock.getDelta();
     
-    // Caméra orthographique pour les axes
-    axesCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-    axesCamera.position.set(0, 0, 1);
-    axesCamera.lookAt(0, 0, 0);
-
-    // Helper des axes
-    axesHelper = new THREE.AxesHelper(0.8);
-    axesScene.add(axesHelper);
-
-    // Création des labels avec des sprites
-    function createTextSprite(text, color) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 64;
-        canvas.height = 64;
-        const context = canvas.getContext('2d');
-        
-        context.font = 'Bold 40px Arial';
-        context.fillStyle = color;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(text, 32, 32);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.2, 0.2, 1);
-        return sprite;
-    }
-
-    // Label X
-    const xLabel = createTextSprite('X', '#ff0000');
-    xLabel.position.set(0.9, 0, 0);
-    axesScene.add(xLabel);
-
-    // Label Y
-    const yLabel = createTextSprite('Y', '#00ff00');
-    yLabel.position.set(0, 0.9, 0);
-    axesScene.add(yLabel);
-
-    // Label Z
-    const zLabel = createTextSprite('Z', '#0000ff');
-    zLabel.position.set(0, 0, 0.9);
-    axesScene.add(zLabel);
-
-    axesInitialized = true;
-}
-
-// Fonction de bruit 1D simplifiée
-function noise1D(x) {
-    const X = Math.floor(x) & 255;
-    x -= Math.floor(x);
-    const fadeX = x * x * (3 - 2 * x);
-    
-    // Utilisation de fonctions trigonométriques pour générer des valeurs pseudo-aléatoires
-    const h1 = Math.sin(X * 12.9898) * 43758.5453123;
-    const h2 = Math.sin((X + 1) * 12.9898) * 43758.5453123;
-    
-    return lerp(h1 - Math.floor(h1), h2 - Math.floor(h2), fadeX);
-}
-
-// Interpolation linéaire
-function lerp(a, b, t) {
-    return a + t * (b - a);
+    // Rendu de la scène principale
+    renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
+    renderer.setClearColor(config.backgroundColor);
+    renderer.render(scene, camera);
 }
 
 // Création des particules
@@ -374,7 +327,7 @@ function createParticles() {
             uniform vec3 color;
             uniform sampler2D pointTexture;
             void main() {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 0.0) * texture2D(pointTexture, gl_PointCoord);
+                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * texture2D(pointTexture, gl_PointCoord);
             }
         `,
         transparent: true,
@@ -405,47 +358,6 @@ function createParticleTexture() {
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     return texture;
-}
-
-// Animation
-function animate() {
-    requestAnimationFrame(animate);
-    const deltaTime = clock.getDelta();
-
-    // Rendu de la scène principale en plein écran
-    renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
-    renderer.setClearColor(config.backgroundColor);
-    renderer.render(scene, camera);
-
-    // Rendu de la scène des axes si initialisée
-    if (axesInitialized && axesScene && axesCamera) {
-        // Sauvegarde du scissor actuel
-        const currentScissor = renderer.getScissorTest();
-        
-        // Configuration pour le rendu des axes
-        const axesWidth = container.clientWidth * 0.15;
-        const axesHeight = axesWidth;
-        const margin = 20;
-        
-        renderer.setScissorTest(true);
-        renderer.setScissor(
-            margin,
-            container.clientHeight - axesHeight - margin,
-            axesWidth,
-            axesHeight
-        );
-        renderer.setViewport(
-            margin,
-            container.clientHeight - axesHeight - margin,
-            axesWidth,
-            axesHeight
-        );
-        renderer.setClearColor(0x000000, 0);
-        renderer.render(axesScene, axesCamera);
-        
-        // Restauration du scissor
-        renderer.setScissorTest(currentScissor);
-    }
 }
 
 // Gestion du redimensionnement

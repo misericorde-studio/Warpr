@@ -23,7 +23,7 @@ const config = {
     cameraFar: 3,
     initialFar: 3,
     finalFar: 4.5,
-    greenThreshold: 0.01,  // Valeur initiale du seuil
+    greenThreshold: 0.01,  // Retour à la valeur initiale originale
     // Configuration de la bordure
     borderWidth: 0.4,        // Largeur de la bordure
     borderParticleCount: 2000, // Nombre de particules dans la bordure
@@ -508,28 +508,73 @@ function updateScroll() {
     const scrollProgress = Math.min(100, Math.max(0, (scrolled / scrollHeight) * 100));
     const animationProgress = Math.min(90, scrollProgress);
     
-    // Déterminer la direction du scroll
     const scrollingUp = scrolled < lastScrollY;
     lastScrollY = scrolled;
 
     // Animation du seuil en fonction du scroll
     let newThreshold;
     if (scrollProgress <= 60) {
-        // De 0 à 60% : animation de 0.01 à 0.17
+        // De 0 à 60% : animation du threshold de 0.01 à 0.17
         const progress = scrollProgress / 60;
         newThreshold = 0.01 + (0.17 - 0.01) * progress;
-    } else if (scrollProgress <= 74) {
-        // De 60% à 74% : animation de 0.17 à -0.60
-        const progress = (scrollProgress - 60) / 14;
-        newThreshold = 0.17 + (-0.60 - 0.17) * progress;
+        
+        // Mise à jour de la position de la barre horizontale
+        const thresholdLine = document.querySelector('.threshold-line');
+        if (thresholdLine) {
+            const heightProgress = progress;
+            const position = 46 - (heightProgress * 4.5); // Remontée jusqu'à 41.5%
+            thresholdLine.style.top = `${position}%`;
+            thresholdLine.style.width = '56%';
+            thresholdLine.style.opacity = '1';
+        }
+    } else if (scrollProgress <= 72) {
+        // De 60% à 72% : descente progressive de la barre de 41.5% à 70%
+        const progress = (scrollProgress - 60) / 12; // Progression sur 12% de scroll
+        
+        // Animation du threshold sur toute la période 60-74%
+        const thresholdProgress = (scrollProgress - 60) / 14;
+        newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
+        
+        const thresholdLine = document.querySelector('.threshold-line');
+        if (thresholdLine) {
+            const position = 41.5 + (progress * 28.5); // Descente progressive de 41.5% à 70%
+            thresholdLine.style.top = `${position}%`;
+            thresholdLine.style.width = '56%';
+            thresholdLine.style.opacity = '1';
+        }
+    } else if (scrollProgress <= 85) {
+        // De 72% à 85% : rétraction de la barre
+        const progress = (scrollProgress - 72) / 13;
+        
+        // Continue l'animation du threshold jusqu'à 74%
+        if (scrollProgress <= 74) {
+            const thresholdProgress = (scrollProgress - 60) / 14;
+            newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
+        } else {
+            newThreshold = -0.51; // Threshold fixe à -0.51
+        }
+        
+        const thresholdLine = document.querySelector('.threshold-line');
+        if (thresholdLine) {
+            thresholdLine.style.top = '70%'; // Position finale à 70% au lieu de 66%
+            thresholdLine.style.width = `${56 - (progress * 56)}%`; // Réduction de la largeur
+            thresholdLine.style.opacity = `${1 - progress}`; // Fondu progressif
+        }
     } else {
-        // Au-delà de 74% : maintenir à -0.60
-        newThreshold = -0.60;
+        // Au-delà de 85%
+        newThreshold = -0.51;
+        
+        const thresholdLine = document.querySelector('.threshold-line');
+        if (thresholdLine) {
+            thresholdLine.style.top = '70%'; // Position finale à 70% au lieu de 66%
+            thresholdLine.style.width = '0%';
+            thresholdLine.style.opacity = '0';
+        }
     }
 
-    // Mise à jour du seuil et des couleurs
     if (config.greenThreshold !== newThreshold) {
         config.greenThreshold = newThreshold;
+
         // Mise à jour de la valeur dans le contrôle
         const greenThresholdControl = document.getElementById('green-threshold');
         const greenThresholdValue = document.getElementById('green-threshold-value');

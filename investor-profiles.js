@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     radius: 1.5,
     particleCount: 2600,
-    particleSize: 6.70,
+    particleSize: 8.40,
     curveAmplitude: 0.4,
     curveFrequency: 9,
     curvePhases: 4,
@@ -27,8 +27,8 @@ const config = {
     // Configuration de la bordure
     borderWidth: 0.4,        // Largeur de la bordure
     borderParticleCount: 2000, // Nombre de particules dans la bordure
-    borderParticleMaxSize: 12.0,  // Taille maximale des particules de la bordure (près du cercle)
-    borderParticleMinSize: 4.0,  // Taille minimale des particules de la bordure (loin du cercle)
+    borderParticleMaxSize: 4.20,  // Modifié de 12.0 à 4.20
+    borderParticleMinSize: 4.20,  // Modifié de 4.0 à 4.20 pour une taille uniforme
     borderColor: 0xFFFFFF,    // Couleur de la bordure
     thicknessVariationMultiplier: 5.0, // Augmenté de 3.0 à 5.0 pour plus de variation d'épaisseur
 };

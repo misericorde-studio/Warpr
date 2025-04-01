@@ -7,8 +7,8 @@ const config = {
     particleCount: 1000,
     particleSize: 8.06,
     curveAmplitude: 0.4,
-    curveFrequency: 24,
-    curvePhases: 8,
+    curveFrequency: 16,
+    curvePhases: 5,
     noiseScale: 0.8,
     noisePower: 1.2,
     backgroundColor: 0x0B0E13,
@@ -31,6 +31,11 @@ const config = {
     borderColor: 0xFFFFFF,    // Couleur de la bordure
     thicknessVariationMultiplier: 3.0, // Multiplicateur pour la variation d'épaisseur
 };
+
+// Valeurs fixes pour les courbes
+const phaseOffsets = [0, Math.PI/3, Math.PI*2/3, Math.PI, Math.PI*4/3];
+const frequencyMultipliers = [1, 0.6, 0.3, 0.8, 0.5];
+const amplitudeMultipliers = [1, 0.8, 0.6, 0.7, 0.5];
 
 // Variables globales
 let scene, camera, renderer, controls;
@@ -186,11 +191,6 @@ function createParticles() {
     const positions = new Float32Array(config.particleCount * 3);
 
     // Valeurs fixes pour la continuité
-    const phaseOffsets = [0, Math.PI/4, Math.PI/2, Math.PI*3/4, Math.PI, Math.PI*5/4, Math.PI*3/2, Math.PI*7/4];
-    const frequencyMultipliers = [1, 0.5, 0.75, 0.25, 0.6, 0.35, 0.8, 0.45];
-    const amplitudeMultipliers = [1, 0.8, 0.6, 0.4, 0.7, 0.5, 0.9, 0.3];
-
-    // Valeurs fixes pour la continuité
     const startValues = new Float32Array(config.curvePhases);
     const endValues = new Float32Array(config.curvePhases);
     for (let phase = 0; phase < config.curvePhases; phase++) {
@@ -281,6 +281,29 @@ function createParticles() {
         const radialAngle = Math.random() * Math.PI * 2;
         const radialOffset = Math.random() * config.borderWidth;
         
+        // Calcul de la position Y basée sur les courbes (avec amplitude modérée)
+        let baseY = 0;
+        for (let phase = 0; phase < config.curvePhases; phase++) {
+            const freq = config.curveFrequency * frequencyMultipliers[phase];
+            const amp = (heightVariation * 2.5) * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            
+            let value = Math.sin(angle * freq + phaseOffsets[phase]);
+            
+            if (progress > 0.95) {
+                const blend = (progress - 0.95) / 0.05;
+                value = value * (1 - blend) + startValues[phase] * blend;
+            }
+            
+            baseY += value * amp;
+        }
+
+        // Ajout d'une variation aléatoire supplémentaire sur Y (réduite)
+        baseY += (Math.random() * 2 - 1) * heightVariation * 1.5;
+
+        // Ajout du bruit avec variation modérée
+        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
+        baseY += noiseValue * (heightVariation * 2);
+        
         // Calcul de la position de base sur le cercle
         const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
         const baseX = Math.cos(angle) * baseRadius;
@@ -291,15 +314,14 @@ function createParticles() {
         const offsetY = (Math.random() - 0.5) * config.borderWidth;
         const offsetZ = Math.sin(radialAngle) * radialOffset;
 
-        // Position initiale (plaquée sur le cercle mais répartie sur Y)
-        const ySpread = (Math.random() * 2 - 1) * 2; // Répartition sur l'axe Y entre -2 et 2
-        initialPositions[i3] = baseX; // Position X plaquée sur le cercle
-        initialPositions[i3 + 1] = ySpread; // Position Y aléatoire
-        initialPositions[i3 + 2] = baseZ; // Position Z plaquée sur le cercle
+        // Position initiale (plaquée sur le cercle avec Y modérément varié)
+        initialPositions[i3] = baseX;
+        initialPositions[i3 + 1] = baseY;
+        initialPositions[i3 + 2] = baseZ;
 
         // Position finale (avec les offsets)
         finalPositions[i3] = baseX + offsetX;
-        finalPositions[i3 + 1] = ySpread; // Garde la même position Y
+        finalPositions[i3 + 1] = baseY; // Garde la même position Y
         finalPositions[i3 + 2] = baseZ + offsetZ;
 
         // Position de départ = position initiale
@@ -520,10 +542,6 @@ function updateParticles() {
     const positions = geometry.attributes.position.array;
 
     // Utilisation des mêmes valeurs fixes
-    const phaseOffsets = [0, Math.PI/4, Math.PI/2, Math.PI*3/4, Math.PI, Math.PI*5/4, Math.PI*3/2, Math.PI*7/4];
-    const frequencyMultipliers = [1, 0.5, 0.75, 0.25, 0.6, 0.35, 0.8, 0.45];
-    const amplitudeMultipliers = [1, 0.8, 0.6, 0.4, 0.7, 0.5, 0.9, 0.3];
-
     const startValues = new Float32Array(config.curvePhases);
     const endValues = new Float32Array(config.curvePhases);
     for (let phase = 0; phase < config.curvePhases; phase++) {

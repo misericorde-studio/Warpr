@@ -23,6 +23,7 @@ const config = {
     cameraFar: 3,
     initialFar: 3,
     finalFar: 4.5,
+    greenThreshold: 0.01,  // Valeur initiale du seuil
     // Configuration de la bordure
     borderWidth: 0.4,        // Largeur de la bordure
     borderParticleCount: 2000, // Nombre de particules dans la bordure
@@ -107,6 +108,7 @@ function init() {
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     
     // Horloge
@@ -147,6 +149,7 @@ function createParticles() {
     // Création des particules principales
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(config.particleCount * 3);
+    const colors = new Float32Array(config.particleCount * 3);
     const mainInitialPositions = new Float32Array(config.particleCount * 3);
     const mainFinalPositions = new Float32Array(config.particleCount * 3);
 
@@ -158,6 +161,11 @@ function createParticles() {
         endValues[phase] = Math.sin(Math.PI * 2 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]);
     }
 
+    // Trouver la hauteur maximale et minimale
+    let maxY = -Infinity;
+    let minY = Infinity;
+
+    // Premier passage pour trouver les valeurs min/max de Y
     for (let i = 0; i < config.particleCount; i++) {
         const i3 = i * 3;
         const angle = (i / config.particleCount) * Math.PI * 2;
@@ -207,6 +215,74 @@ function createParticles() {
         const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
         y += noiseValue * heightVariation;
 
+        maxY = Math.max(maxY, y);
+        minY = Math.min(minY, y);
+    }
+
+    // Deuxième passage pour définir les positions et les couleurs
+    for (let i = 0; i < config.particleCount; i++) {
+        const i3 = i * 3;
+        const angle = (i / config.particleCount) * Math.PI * 2;
+        const progress = i / (config.particleCount - 1);
+
+        // Réduction de la variation d'angle pour une distribution plus régulière
+        const angleVariation = (Math.random() - 0.5) * 0.02;
+        const finalAngle = angle + angleVariation;
+        
+        // Distribution radiale plus régulière avec variation minimale
+        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
+        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
+        
+        // État initial : toutes les particules presque sur le cercle de base
+        const initialRadius = config.radius * (1 + layerOffset * 0.2);
+        
+        // État final : variation radiale légèrement plus prononcée
+        const finalRadius = config.radius * (1 + layerOffset);
+
+        // Positions initiales (quasi-régulières sur le cercle)
+        const initialX = Math.cos(finalAngle) * initialRadius;
+        const initialZ = Math.sin(finalAngle) * initialRadius;
+
+        // Positions finales (légèrement plus variées)
+        const finalX = Math.cos(finalAngle) * finalRadius;
+        const finalZ = Math.sin(finalAngle) * finalRadius;
+
+        // Calcul de la hauteur Y avec distribution contrôlée
+        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
+        const baseThickness = lineThickness * (1 + thicknessVariation);
+        const randomY = (Math.random() * 2 - 1) * baseThickness;
+        let y = randomY;
+        
+        // Ajout des variations de hauteur de manière plus régulière
+        for (let phase = 0; phase < config.curvePhases; phase++) {
+            const freq = config.curveFrequency * frequencyMultipliers[phase];
+            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
+            if (progress > 0.95) {
+                const blend = (progress - 0.95) / 0.05;
+                value = value * (1 - blend) + startValues[phase] * blend;
+            }
+            y += value * amp;
+        }
+
+        // Ajout du bruit avec une influence réduite
+        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
+        y += noiseValue * heightVariation;
+
+        // Définir la couleur en fonction de la hauteur normalisée
+        const normalizedHeight = (y - minY) / (maxY - minY);
+        if (normalizedHeight > config.greenThreshold) {
+            // Couleur verte (#00FEA5)
+            colors[i3] = 0.0;      // R
+            colors[i3 + 1] = 0.996; // G (254/255)
+            colors[i3 + 2] = 0.647; // B (165/255)
+        } else {
+            // Couleur blanche
+            colors[i3] = 1.0;     // R
+            colors[i3 + 1] = 1.0; // G
+            colors[i3 + 2] = 1.0; // B
+        }
+
         // Stockage des positions
         mainInitialPositions[i3] = initialX;
         mainInitialPositions[i3 + 1] = y;
@@ -216,26 +292,55 @@ function createParticles() {
         mainFinalPositions[i3 + 1] = y;
         mainFinalPositions[i3 + 2] = finalZ;
 
-        // Position de départ = position initiale
         positions[i3] = initialX;
         positions[i3 + 1] = y;
         positions[i3 + 2] = initialZ;
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('initialPosition', new THREE.BufferAttribute(mainInitialPositions, 3));
     geometry.setAttribute('finalPosition', new THREE.BufferAttribute(mainFinalPositions, 3));
 
-    const material = new THREE.PointsMaterial({
-        size: config.particleSize,
-        color: 0xFFFFFF,
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            pointTexture: { value: createParticleTexture() },
+            pointSize: { value: config.particleSize }
+        },
+        vertexShader: `
+            varying float vY;
+            uniform float pointSize;
+            
+            void main() {
+                vY = position.y;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = pointSize;
+            }
+        `,
+        fragmentShader: `
+            varying float vY;
+            uniform sampler2D pointTexture;
+            
+            void main() {
+                vec2 center = vec2(0.5, 0.5);
+                float dist = length(gl_PointCoord - center);
+                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                
+                vec3 color = vec3(1.0);
+                if (vY > ${config.greenThreshold}) {
+                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+                }
+                
+                gl_FragColor = vec4(color, alpha);
+                
+                if (alpha < 0.01) discard;
+            }
+        `,
         transparent: true,
-        opacity: 1,
-        sizeAttenuation: false,
-        blending: THREE.NormalBlending,
         depthWrite: false,
         depthTest: false,
-        map: createParticleTexture()
+        blending: THREE.NormalBlending
     });
 
     particles = new THREE.Points(geometry, material);
@@ -318,22 +423,36 @@ function createParticles() {
 
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            color: { value: new THREE.Color(config.borderColor) },
             pointTexture: { value: createParticleTexture() }
         },
         vertexShader: `
             attribute float size;
+            varying float vY;
+            
             void main() {
+                vY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 gl_PointSize = size;
             }
         `,
         fragmentShader: `
-            uniform vec3 color;
+            varying float vY;
             uniform sampler2D pointTexture;
+            
             void main() {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * texture2D(pointTexture, gl_PointCoord);
+                vec2 center = vec2(0.5, 0.5);
+                float dist = length(gl_PointCoord - center);
+                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                
+                vec3 color = vec3(1.0);
+                if (vY > ${config.greenThreshold}) {
+                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+                }
+                
+                gl_FragColor = vec4(color, alpha);
+                
+                if (alpha < 0.01) discard;
             }
         `,
         transparent: true,
@@ -392,6 +511,34 @@ function updateScroll() {
     // Déterminer la direction du scroll
     const scrollingUp = scrolled < lastScrollY;
     lastScrollY = scrolled;
+
+    // Animation du seuil en fonction du scroll
+    let newThreshold;
+    if (scrollProgress <= 60) {
+        // De 0 à 60% : animation de 0.01 à 0.17
+        const progress = scrollProgress / 60;
+        newThreshold = 0.01 + (0.17 - 0.01) * progress;
+    } else if (scrollProgress <= 74) {
+        // De 60% à 74% : animation de 0.17 à -0.60
+        const progress = (scrollProgress - 60) / 14;
+        newThreshold = 0.17 + (-0.60 - 0.17) * progress;
+    } else {
+        // Au-delà de 74% : maintenir à -0.60
+        newThreshold = -0.60;
+    }
+
+    // Mise à jour du seuil et des couleurs
+    if (config.greenThreshold !== newThreshold) {
+        config.greenThreshold = newThreshold;
+        // Mise à jour de la valeur dans le contrôle
+        const greenThresholdControl = document.getElementById('green-threshold');
+        const greenThresholdValue = document.getElementById('green-threshold-value');
+        if (greenThresholdControl && greenThresholdValue) {
+            greenThresholdControl.value = newThreshold;
+            greenThresholdValue.textContent = newThreshold.toFixed(2);
+        }
+        updateColors();
+    }
 
     if (particles) {
         // Rotation Y continue de 0° à -180° sur toute la durée du scroll (jusqu'à 100%)
@@ -636,6 +783,8 @@ function setupControls() {
     const toggleControlsBtn = document.getElementById('toggle-controls');
     const showControlsBtn = document.getElementById('show-controls');
     const controlsPanel = document.getElementById('controls-panel');
+    const greenThresholdControl = document.getElementById('green-threshold');
+    const greenThresholdValue = document.getElementById('green-threshold-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -674,8 +823,8 @@ function setupControls() {
     mainParticleSizeControl.addEventListener('input', (e) => {
         config.particleSize = parseFloat(e.target.value);
         mainParticleSizeValue.textContent = config.particleSize.toFixed(2);
-        if (particles) {
-            particles.material.size = config.particleSize;
+        if (particles && particles.material.uniforms) {
+            particles.material.uniforms.pointSize.value = config.particleSize;
         }
     });
 
@@ -737,7 +886,81 @@ function setupControls() {
         config.borderParticleMinSize = minThickness * 100;
         updateParticles();
     });
+
+    greenThresholdControl.addEventListener('input', (e) => {
+        config.greenThreshold = parseFloat(e.target.value);
+        greenThresholdValue.textContent = config.greenThreshold.toFixed(2);
+        updateColors();
+    });
 }
 
 // Démarrage
 document.addEventListener('DOMContentLoaded', init);
+
+function updateColors() {
+    if (!particles) return;
+    
+    // Recompiler le shader avec la nouvelle valeur de seuil
+    const fragmentShader = `
+        varying float vY;
+        uniform sampler2D pointTexture;
+        
+        void main() {
+            vec2 center = vec2(0.5, 0.5);
+            float dist = length(gl_PointCoord - center);
+            float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+            
+            vec3 color = vec3(1.0);
+            if (vY > ${config.greenThreshold}) {
+                color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+            }
+            
+            gl_FragColor = vec4(color, alpha);
+            
+            if (alpha < 0.01) discard;
+        }
+    `;
+    
+    particles.material.fragmentShader = fragmentShader;
+    particles.material.needsUpdate = true;
+
+    // Appliquer également aux particules de bordure
+    if (borderParticles) {
+        const borderFragmentShader = `
+            varying float vY;
+            uniform sampler2D pointTexture;
+            
+            void main() {
+                vec2 center = vec2(0.5, 0.5);
+                float dist = length(gl_PointCoord - center);
+                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                
+                vec3 color = vec3(1.0);
+                if (vY > ${config.greenThreshold}) {
+                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+                }
+                
+                gl_FragColor = vec4(color, alpha);
+                
+                if (alpha < 0.01) discard;
+            }
+        `;
+
+        // Mettre à jour le vertex shader de la bordure pour passer la position Y
+        const borderVertexShader = `
+            attribute float size;
+            varying float vY;
+            
+            void main() {
+                vY = position.y;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = size;
+            }
+        `;
+
+        borderParticles.material.vertexShader = borderVertexShader;
+        borderParticles.material.fragmentShader = borderFragmentShader;
+        borderParticles.material.needsUpdate = true;
+    }
+}

@@ -519,11 +519,12 @@ function updateScroll() {
         newThreshold = 0.01 + (0.17 - 0.01) * progress;
         
         // Mise à jour de la position de la barre horizontale
+        const thresholdContainer = document.querySelector('.threshold-line-container');
         const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine) {
+        if (thresholdLine && thresholdContainer) {
             const heightProgress = progress;
             const position = 46 - (heightProgress * 4.5); // Remontée jusqu'à 41.5%
-            thresholdLine.style.top = `${position}%`;
+            thresholdContainer.style.top = `${position}%`;
             thresholdLine.style.width = '56%';
             thresholdLine.style.opacity = '1';
         }
@@ -535,16 +536,17 @@ function updateScroll() {
         const thresholdProgress = (scrollProgress - 60) / 14;
         newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
         
+        const thresholdContainer = document.querySelector('.threshold-line-container');
         const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine) {
+        if (thresholdLine && thresholdContainer) {
             const position = 41.5 + (progress * 28.5); // Descente progressive de 41.5% à 70%
-            thresholdLine.style.top = `${position}%`;
+            thresholdContainer.style.top = `${position}%`;
             thresholdLine.style.width = '56%';
             thresholdLine.style.opacity = '1';
         }
-    } else if (scrollProgress <= 85) {
-        // De 72% à 85% : rétraction de la barre
-        const progress = (scrollProgress - 72) / 13;
+    } else if (scrollProgress <= 80) {
+        // De 72% à 80% : rétraction de la barre vers son centre
+        const progress = (scrollProgress - 72) / 8;
         
         // Continue l'animation du threshold jusqu'à 74%
         if (scrollProgress <= 74) {
@@ -554,19 +556,22 @@ function updateScroll() {
             newThreshold = -0.51; // Threshold fixe à -0.51
         }
         
+        const thresholdContainer = document.querySelector('.threshold-line-container');
         const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine) {
-            thresholdLine.style.top = '70%'; // Position finale à 70% au lieu de 66%
-            thresholdLine.style.width = `${56 - (progress * 56)}%`; // Réduction de la largeur
-            thresholdLine.style.opacity = `${1 - progress}`; // Fondu progressif
+        if (thresholdLine && thresholdContainer) {
+            thresholdContainer.style.top = '70%';
+            // Réduction simple de la largeur
+            thresholdLine.style.width = `${56 * (1 - progress)}%`;
+            thresholdLine.style.opacity = `${1 - progress}`;
         }
     } else {
-        // Au-delà de 85%
+        // Au-delà de 80%
         newThreshold = -0.51;
         
+        const thresholdContainer = document.querySelector('.threshold-line-container');
         const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine) {
-            thresholdLine.style.top = '70%'; // Position finale à 70% au lieu de 66%
+        if (thresholdLine && thresholdContainer) {
+            thresholdContainer.style.top = '70%';
             thresholdLine.style.width = '0%';
             thresholdLine.style.opacity = '0';
         }

@@ -89,14 +89,20 @@
             padding: 16% 22%;
         }
 
-        .threshold-line {
+        .threshold-line-container {
             position: absolute;
             z-index: 105;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            top: 46%;
+            pointer-events: none;
+        }
+
+        .threshold-line {
             width: 56%;
             height: 1px;
             background: #00FEA5;
-            left: 22%;
-            top: 46%;
             pointer-events: none;
             transform-origin: center;
             filter: drop-shadow(0px 0px 6px #00FEA5) drop-shadow(0px 0px 11px #4FFFC1);
@@ -337,7 +343,9 @@
 <body>
     <div class="airdrop">
         <div class="airdrop_left">
-            <div class="threshold-line"></div>
+            <div class="threshold-line-container">
+                <div class="threshold-line"></div>
+            </div>
             <div class="vertical-lines-wrapper">
                 <div class="vertical-line"></div>
                 <div class="vertical-line"></div>

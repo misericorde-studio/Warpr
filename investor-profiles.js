@@ -34,12 +34,15 @@ const config = {
 
 // Variables globales
 let scene, camera, renderer, controls;
+let axesScene, axesCamera;
 let particles, borderParticles;
 let clock;
 let container;
 let heightVariation = 0.2;
 let lineThickness = 0.04;
-let lastScrollY = 0; // Pour tracker la direction du scroll
+let lastScrollY = 0;
+let axesHelper;
+let axesInitialized = false;
 
 // Initialisation
 function init() {
@@ -50,7 +53,7 @@ function init() {
         return;
     }
     
-    // Scène
+    // Scène principale
     scene = new THREE.Scene();
     scene.background = new THREE.Color(config.backgroundColor);
 
@@ -66,7 +69,7 @@ function init() {
         config.cameraFar
     );
 
-    // Positionnement initial de la caméra du côté négatif
+    // Positionnement initial de la caméra
     camera.position.set(0, 0, config.cameraDistance);
     camera.lookAt(0, 0, 0);
     camera.zoom = config.initialZoom;
@@ -80,6 +83,9 @@ function init() {
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
+    
+    // Initialisation de la scène des axes
+    initAxesHelper();
 
     // Horloge
     clock = new THREE.Clock();
@@ -101,6 +107,58 @@ function init() {
 
     // Animation
     animate();
+}
+
+// Initialisation du helper des axes
+function initAxesHelper() {
+    // Création de la scène des axes
+    axesScene = new THREE.Scene();
+    
+    // Caméra orthographique pour les axes
+    axesCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    axesCamera.position.set(0, 0, 1);
+    axesCamera.lookAt(0, 0, 0);
+
+    // Helper des axes
+    axesHelper = new THREE.AxesHelper(0.8);
+    axesScene.add(axesHelper);
+
+    // Création des labels avec des sprites
+    function createTextSprite(text, color) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const context = canvas.getContext('2d');
+        
+        context.font = 'Bold 40px Arial';
+        context.fillStyle = color;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, 32, 32);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(0.2, 0.2, 1);
+        return sprite;
+    }
+
+    // Label X
+    const xLabel = createTextSprite('X', '#ff0000');
+    xLabel.position.set(0.9, 0, 0);
+    axesScene.add(xLabel);
+
+    // Label Y
+    const yLabel = createTextSprite('Y', '#00ff00');
+    yLabel.position.set(0, 0.9, 0);
+    axesScene.add(yLabel);
+
+    // Label Z
+    const zLabel = createTextSprite('Z', '#0000ff');
+    zLabel.position.set(0, 0, 0.9);
+    axesScene.add(zLabel);
+
+    axesInitialized = true;
 }
 
 // Fonction de bruit 1D simplifiée
@@ -223,41 +281,25 @@ function createParticles() {
         const radialAngle = Math.random() * Math.PI * 2;
         const radialOffset = Math.random() * config.borderWidth;
         
-        // Calcul de la position de base
-        let baseY = 0;
-        for (let phase = 0; phase < config.curvePhases; phase++) {
-            const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            
-            let value = Math.sin(angle * freq + phaseOffsets[phase]);
-            
-            if (progress > 0.95) {
-                const blend = (progress - 0.95) / 0.05;
-                value = value * (1 - blend) + startValues[phase] * blend;
-            }
-            
-            baseY += value * amp;
-        }
-
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
-        baseY += noiseValue * heightVariation;
-
+        // Calcul de la position de base sur le cercle
         const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
         const baseX = Math.cos(angle) * baseRadius;
         const baseZ = Math.sin(angle) * baseRadius;
 
+        // Calcul des offsets pour la position finale
         const offsetX = Math.cos(radialAngle) * radialOffset;
         const offsetY = (Math.random() - 0.5) * config.borderWidth;
         const offsetZ = Math.sin(radialAngle) * radialOffset;
 
-        // Position initiale (plaquée contre le cercle)
-        initialPositions[i3] = baseX;
-        initialPositions[i3 + 1] = baseY;
-        initialPositions[i3 + 2] = baseZ;
+        // Position initiale (plaquée sur le cercle mais répartie sur Y)
+        const ySpread = (Math.random() * 2 - 1) * 2; // Répartition sur l'axe Y entre -2 et 2
+        initialPositions[i3] = baseX; // Position X plaquée sur le cercle
+        initialPositions[i3 + 1] = ySpread; // Position Y aléatoire
+        initialPositions[i3 + 2] = baseZ; // Position Z plaquée sur le cercle
 
-        // Position finale (avec offset)
+        // Position finale (avec les offsets)
         finalPositions[i3] = baseX + offsetX;
-        finalPositions[i3 + 1] = baseY + offsetY;
+        finalPositions[i3 + 1] = ySpread; // Garde la même position Y
         finalPositions[i3 + 2] = baseZ + offsetZ;
 
         // Position de départ = position initiale
@@ -326,6 +368,47 @@ function createParticleTexture() {
     return texture;
 }
 
+// Animation
+function animate() {
+    requestAnimationFrame(animate);
+    const deltaTime = clock.getDelta();
+
+    // Rendu de la scène principale en plein écran
+    renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
+    renderer.setClearColor(config.backgroundColor);
+    renderer.render(scene, camera);
+
+    // Rendu de la scène des axes si initialisée
+    if (axesInitialized && axesScene && axesCamera) {
+        // Sauvegarde du scissor actuel
+        const currentScissor = renderer.getScissorTest();
+        
+        // Configuration pour le rendu des axes
+        const axesWidth = container.clientWidth * 0.15;
+        const axesHeight = axesWidth;
+        const margin = 20;
+        
+        renderer.setScissorTest(true);
+        renderer.setScissor(
+            margin,
+            container.clientHeight - axesHeight - margin,
+            axesWidth,
+            axesHeight
+        );
+        renderer.setViewport(
+            margin,
+            container.clientHeight - axesHeight - margin,
+            axesWidth,
+            axesHeight
+        );
+        renderer.setClearColor(0x000000, 0);
+        renderer.render(axesScene, axesCamera);
+        
+        // Restauration du scissor
+        renderer.setScissorTest(currentScissor);
+    }
+}
+
 // Gestion du redimensionnement
 function onWindowResize() {
     if (!container) return;
@@ -337,8 +420,8 @@ function onWindowResize() {
     camera.right = frustumSize * aspect / 2;
     camera.top = frustumSize / 2;
     camera.bottom = frustumSize / -2;
-    
     camera.updateProjectionMatrix();
+    
     renderer.setSize(container.clientWidth, container.clientHeight);
 }
 
@@ -428,13 +511,6 @@ function updateScroll() {
             borderParticles.rotation.copy(particles.rotation);
         }
     }
-}
-
-// Animation
-function animate() {
-    requestAnimationFrame(animate);
-    const deltaTime = clock.getDelta();
-    renderer.render(scene, camera);
 }
 
 function updateParticles() {

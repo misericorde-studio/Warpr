@@ -78,6 +78,23 @@
             pointer-events: none;
         }
 
+        .vertical-lines-wrapper {
+            position: absolute;
+            z-index: 100;
+            height: calc(100% - 3.5rem);
+            width: 100%;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            padding: 16% 22%;
+        }
+
+        .vertical-line {
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         .cross{
             width: 10px;
             height: 10px;
@@ -306,6 +323,23 @@
 <body>
     <div class="airdrop">
         <div class="airdrop_left">
+            <div class="vertical-lines-wrapper">
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+                <div class="vertical-line"></div>
+            </div>
             <div class="crosses-wrapper">
                 <div class="cross cross_1"><img src="img/cross.png" alt="cross"></div>
                 <div class="cross cross_2"><img src="img/cross.png" alt="cross"></div>

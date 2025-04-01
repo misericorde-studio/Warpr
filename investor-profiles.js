@@ -41,6 +41,11 @@ let container;
 let heightVariation = 0.22;
 let lineThickness = 0.030;
 let lastScrollY = 0;
+let lastFrameTime = 0;
+let thresholdContainer, thresholdLine; // Cache pour les éléments DOM fréquemment utilisés
+let particleShader, borderShader; // Cache pour les shaders
+let isScrolling = false;
+let scrollTimeout;
 
 // Tableaux de positions
 let mainInitialPositions;
@@ -122,21 +127,41 @@ function init() {
         particles.position.set(0, 0, 0);
     }
 
+    // Mise en cache des éléments DOM
+    cacheElements();
+
     // Événements
-    window.addEventListener('resize', onWindowResize, false);
-    window.addEventListener('scroll', updateScroll, false);
+    window.addEventListener('resize', throttle(onWindowResize, 100), false);
+    window.addEventListener('scroll', throttle(updateScroll, 16), { passive: true }); // Optimisation avec passive: true
+    
+    // Utilisation de scroll events optimisés
+    window.addEventListener('scroll', function() {
+        if (!isScrolling) {
+            isScrolling = true;
+        }
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(function() {
+            isScrolling = false;
+        }, 150);
+    }, { passive: true });
 
     // Ajout de l'initialisation des contrôles
     setupControls();
 
-    // Animation
-    animate();
+    // Animation avec timestamp
+    lastFrameTime = performance.now();
+    animate(lastFrameTime);
 }
 
-// Animation
-function animate() {
+// Animation optimisée
+function animate(timestamp) {
     requestAnimationFrame(animate);
-    const deltaTime = clock.getDelta();
+    
+    // Limiter le framerate à ~60fps
+    if (timestamp - lastFrameTime < 16) {
+        return;
+    }
+    lastFrameTime = timestamp;
     
     // Rendu de la scène principale
     renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
@@ -344,6 +369,7 @@ function createParticles() {
     });
 
     particles = new THREE.Points(geometry, material);
+    particles.frustumCulled = true; // Active le frustum culling
     scene.add(particles);
 
     // Création des particules de la bordure
@@ -461,6 +487,7 @@ function createParticles() {
     });
 
     borderParticles = new THREE.Points(borderGeometry, borderMaterial);
+    borderParticles.frustumCulled = true; // Active le frustum culling
     scene.add(borderParticles);
 }
 
@@ -501,7 +528,65 @@ function onWindowResize() {
     renderer.setSize(container.clientWidth, container.clientHeight);
 }
 
-// Fonction pour mettre à jour la rotation en fonction du scroll
+// Fonction pour mettre en cache les éléments DOM
+function cacheElements() {
+    thresholdContainer = document.querySelector('.threshold-line-container');
+    thresholdLine = document.querySelector('.threshold-line');
+}
+
+// Fonction pour mettre à jour la position de la barre de seuil
+function updateThresholdLine(position, width, opacity) {
+    if (!thresholdContainer || !thresholdLine) return;
+    
+    thresholdContainer.style.top = `${position}%`;
+    
+    if (width !== undefined) {
+        thresholdLine.style.width = width;
+    }
+    
+    if (opacity !== undefined) {
+        thresholdLine.style.opacity = opacity;
+    }
+}
+
+// Fonction pour throttle les événements fréquents
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// Optimisation de la mise à jour des couleurs
+function updateColors() {
+    if (!particles) return;
+    
+    // Utiliser le remplacement de texte plutôt que de recompiler tout le shader
+    if (particles.material && particles.material.fragmentShader) {
+        particles.material.fragmentShader = particles.material.fragmentShader.replace(
+            /if \(vY > ([-0-9.]+)\)/,
+            `if (vY > ${config.greenThreshold})`
+        );
+        particles.material.needsUpdate = true;
+    }
+
+    // Même chose pour les particules de bordure
+    if (borderParticles && borderParticles.material && borderParticles.material.fragmentShader) {
+        borderParticles.material.fragmentShader = borderParticles.material.fragmentShader.replace(
+            /if \(vY > ([-0-9.]+)\)/,
+            `if (vY > ${config.greenThreshold})`
+        );
+        borderParticles.material.needsUpdate = true;
+    }
+}
+
+// Optimisation de la fonction updateScroll
 function updateScroll() {
     const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
     const scrolled = window.scrollY;
@@ -519,15 +604,9 @@ function updateScroll() {
         newThreshold = 0.01 + (0.17 - 0.01) * progress;
         
         // Mise à jour de la position de la barre horizontale
-        const thresholdContainer = document.querySelector('.threshold-line-container');
-        const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine && thresholdContainer) {
-            const heightProgress = progress;
-            const position = 46 - (heightProgress * 4.5); // Remontée jusqu'à 41.5%
-            thresholdContainer.style.top = `${position}%`;
-            thresholdLine.style.width = '56%';
-            thresholdLine.style.opacity = '1';
-        }
+        const heightProgress = progress;
+        const position = 46 - (heightProgress * 4.5); // Remontée jusqu'à 41.5%
+        updateThresholdLine(position, '56%', '1');
     } else if (scrollProgress <= 72) {
         // De 60% à 72% : descente progressive de la barre de 41.5% à 70%
         const progress = (scrollProgress - 60) / 12; // Progression sur 12% de scroll
@@ -536,14 +615,8 @@ function updateScroll() {
         const thresholdProgress = (scrollProgress - 60) / 14;
         newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
         
-        const thresholdContainer = document.querySelector('.threshold-line-container');
-        const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine && thresholdContainer) {
-            const position = 41.5 + (progress * 28.5); // Descente progressive de 41.5% à 70%
-            thresholdContainer.style.top = `${position}%`;
-            thresholdLine.style.width = '56%';
-            thresholdLine.style.opacity = '1';
-        }
+        const position = 41.5 + (progress * 28.5); // Descente progressive de 41.5% à 70%
+        updateThresholdLine(position, '56%', '1');
     } else if (scrollProgress <= 80) {
         // De 72% à 80% : rétraction de la barre vers son centre
         const progress = (scrollProgress - 72) / 8;
@@ -556,40 +629,30 @@ function updateScroll() {
             newThreshold = -0.51; // Threshold fixe à -0.51
         }
         
-        const thresholdContainer = document.querySelector('.threshold-line-container');
-        const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine && thresholdContainer) {
-            thresholdContainer.style.top = '70%';
-            // Réduction simple de la largeur
-            thresholdLine.style.width = `${56 * (1 - progress)}%`;
-            thresholdLine.style.opacity = `${1 - progress}`;
-        }
+        updateThresholdLine(70, `${56 * (1 - progress)}%`, `${1 - progress}`);
     } else {
         // Au-delà de 80%
         newThreshold = -0.51;
-        
-        const thresholdContainer = document.querySelector('.threshold-line-container');
-        const thresholdLine = document.querySelector('.threshold-line');
-        if (thresholdLine && thresholdContainer) {
-            thresholdContainer.style.top = '70%';
-            thresholdLine.style.width = '0%';
-            thresholdLine.style.opacity = '0';
-        }
+        updateThresholdLine(70, '0%', '0');
     }
 
-    if (config.greenThreshold !== newThreshold) {
+    // Mise à jour du seuil de couleur uniquement si la valeur a changé
+    if (Math.abs(config.greenThreshold - newThreshold) > 0.001) {
         config.greenThreshold = newThreshold;
 
-        // Mise à jour de la valeur dans le contrôle
-        const greenThresholdControl = document.getElementById('green-threshold');
-        const greenThresholdValue = document.getElementById('green-threshold-value');
-        if (greenThresholdControl && greenThresholdValue) {
-            greenThresholdControl.value = newThreshold;
-            greenThresholdValue.textContent = newThreshold.toFixed(2);
+        // Mise à jour de la valeur dans le contrôle (moins fréquente)
+        if (scrollProgress % 5 < 1) { // 1 mise à jour sur 5 pour les contrôles UI
+            const greenThresholdControl = document.getElementById('green-threshold');
+            const greenThresholdValue = document.getElementById('green-threshold-value');
+            if (greenThresholdControl && greenThresholdValue) {
+                greenThresholdControl.value = newThreshold;
+                greenThresholdValue.textContent = newThreshold.toFixed(2);
+            }
         }
         updateColors();
     }
 
+    // Animation des rotations et positions seulement si nous sommes en train de défiler
     if (particles) {
         // Rotation Y continue de 0° à -180° sur toute la durée du scroll (jusqu'à 100%)
         const rotationY = -(scrollProgress / 100) * (180 * Math.PI / 180);
@@ -603,20 +666,29 @@ function updateScroll() {
             // Animation de l'épaisseur pendant la rotation finale (60-90%)
             const deploymentProgress = (animationProgress - 60) / 30;
             
-            // Animation des particules principales
+            // Animation des particules - méthode non-saccadée
             const mainPositions = particles.geometry.attributes.position.array;
             const mainInitialPos = particles.geometry.attributes.initialPosition.array;
             const mainFinalPos = particles.geometry.attributes.finalPosition.array;
             
-            for (let i = 0; i < mainPositions.length; i += 3) {
-                // Interpolation linéaire entre les positions initiales et finales
-                mainPositions[i] = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
-                mainPositions[i + 1] = mainInitialPos[i + 1];
-                mainPositions[i + 2] = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
+            // Pour les particules de bordure, on traite toutes les particules à chaque frame
+            // pour éviter les saccades, mais on réduit quand même la fréquence globale
+            if (scrollProgress % 2 === 0) {
+                // Mettre à jour toutes les particules principales par lots
+                const particlesPerBatch = Math.ceil(mainPositions.length / 9); // Diviser en 3 lots
+                const batchIndex = Math.floor(scrollProgress % 3); // Déterminer le lot actuel (0, 1, ou 2)
+                const startIdx = batchIndex * particlesPerBatch * 3;
+                const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
+                
+                for (let i = startIdx; i < endIdx; i += 3) {
+                    mainPositions[i] = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
+                    mainPositions[i + 1] = mainInitialPos[i + 1];
+                    mainPositions[i + 2] = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
             }
-            particles.geometry.attributes.position.needsUpdate = true;
-
-            // Animation des particules de bordure
+            
+            // Toujours mettre à jour TOUTES les particules de bordure pour éviter les saccades
             if (borderParticles && borderParticles.geometry) {
                 const positions = borderParticles.geometry.attributes.position.array;
                 const initialPos = borderParticles.geometry.attributes.initialPosition.array;
@@ -624,22 +696,47 @@ function updateScroll() {
                 
                 for (let i = 0; i < positions.length; i += 3) {
                     positions[i] = initialPos[i] + (finalPos[i] - initialPos[i]) * deploymentProgress;
-                    positions[i + 1] = initialPos[i + 1] + (finalPos[i + 1] - initialPos[i + 1]) * deploymentProgress;
+                    positions[i + 1] = initialPos[i + 1];
                     positions[i + 2] = initialPos[i + 2] + (finalPos[i + 2] - initialPos[i + 2]) * deploymentProgress;
                 }
                 borderParticles.geometry.attributes.position.needsUpdate = true;
             }
         } else {
-            // Réinitialiser la rotation X et les positions si on remonte avant 60%
+            // Réinitialiser la rotation X si on remonte avant 60%
             particles.rotation.x = 0;
             
-            const mainPositions = particles.geometry.attributes.position.array;
-            const mainInitialPos = particles.geometry.attributes.initialPosition.array;
-            
-            for (let i = 0; i < mainPositions.length; i++) {
-                mainPositions[i] = mainInitialPos[i];
+            // Réinitialiser les positions des particules principales par lots,
+            // mais traiter toutes les particules de bordure à chaque fois
+            if (scrollProgress % 5 === 0) {
+                const mainPositions = particles.geometry.attributes.position.array;
+                const mainInitialPos = particles.geometry.attributes.initialPosition.array;
+                
+                // Mise à jour d'un sous-ensemble de particules principales
+                const particlesPerBatch = Math.ceil(mainPositions.length / 15); // 5 lots de particules (1/3 des particules tous les 5%)
+                const batchIndex = Math.floor((scrollProgress / 5) % 5); // 0 à 4
+                const startIdx = batchIndex * particlesPerBatch * 3;
+                const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
+                
+                for (let i = startIdx; i < endIdx; i += 3) {
+                    mainPositions[i] = mainInitialPos[i];
+                    mainPositions[i + 1] = mainInitialPos[i + 1];
+                    mainPositions[i + 2] = mainInitialPos[i + 2];
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+                
+                // Réinitialiser toutes les particules de bordure
+                if (borderParticles && borderParticles.geometry) {
+                    const positions = borderParticles.geometry.attributes.position.array;
+                    const initialPos = borderParticles.geometry.attributes.initialPosition.array;
+                    
+                    for (let i = 0; i < positions.length; i += 3) {
+                        positions[i] = initialPos[i];
+                        positions[i + 1] = initialPos[i + 1];
+                        positions[i + 2] = initialPos[i + 2];
+                    }
+                    borderParticles.geometry.attributes.position.needsUpdate = true;
+                }
             }
-            particles.geometry.attributes.position.needsUpdate = true;
         }
 
         // Gestion du zoom et de la distance max
@@ -685,132 +782,6 @@ function updateScroll() {
             borderParticles.rotation.copy(particles.rotation);
         }
     }
-}
-
-// Fonction pour mettre à jour les positions des particules
-function updateParticles() {
-    if (!particles) return;
-
-    const geometry = particles.geometry;
-    positions = geometry.attributes.position.array;
-    mainInitialPositions = new Float32Array(config.particleCount * 3);
-    mainFinalPositions = new Float32Array(config.particleCount * 3);
-
-    // Valeurs fixes pour la continuité
-    const startValues = new Float32Array(config.curvePhases);
-    const endValues = new Float32Array(config.curvePhases);
-    for (let phase = 0; phase < config.curvePhases; phase++) {
-        startValues[phase] = Math.sin(0 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]);
-        endValues[phase] = Math.sin(Math.PI * 2 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]);
-    }
-
-    for (let i = 0; i < config.particleCount; i++) {
-        const i3 = i * 3;
-        const angle = (i / config.particleCount) * Math.PI * 2;
-        const progress = i / (config.particleCount - 1);
-
-        // Réduction de la variation d'angle pour une distribution plus régulière
-        const angleVariation = (Math.random() - 0.5) * 0.02;
-        const finalAngle = angle + angleVariation;
-        
-        // Distribution radiale plus régulière avec variation minimale
-        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
-        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
-        
-        // État initial : toutes les particules presque sur le cercle de base
-        const initialRadius = config.radius * (1 + layerOffset * 0.2);
-        
-        // État final : variation radiale légèrement plus prononcée
-        const finalRadius = config.radius * (1 + layerOffset);
-
-        // Positions initiales (quasi-régulières sur le cercle)
-        const initialX = Math.cos(finalAngle) * initialRadius;
-        const initialZ = Math.sin(finalAngle) * initialRadius;
-
-        // Positions finales (légèrement plus variées)
-        const finalX = Math.cos(finalAngle) * finalRadius;
-        const finalZ = Math.sin(finalAngle) * finalRadius;
-
-        // Calcul de la hauteur Y avec distribution contrôlée
-        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
-        const baseThickness = lineThickness * (1 + thicknessVariation);
-        const randomY = (Math.random() * 2 - 1) * baseThickness;
-        let y = randomY;
-        
-        // Ajout des variations de hauteur de manière plus régulière
-        for (let phase = 0; phase < config.curvePhases; phase++) {
-            const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
-            if (progress > 0.95) {
-                const blend = (progress - 0.95) / 0.05;
-                value = value * (1 - blend) + startValues[phase] * blend;
-            }
-            y += value * amp;
-        }
-
-        // Ajout du bruit avec une influence réduite
-        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
-        y += noiseValue * heightVariation;
-
-        // Mise à jour des positions
-        mainInitialPositions[i3] = initialX;
-        mainInitialPositions[i3 + 1] = y;
-        mainInitialPositions[i3 + 2] = initialZ;
-
-        mainFinalPositions[i3] = finalX;
-        mainFinalPositions[i3 + 1] = y;
-        mainFinalPositions[i3 + 2] = finalZ;
-
-        positions[i3] = initialX;
-        positions[i3 + 1] = y;
-        positions[i3 + 2] = initialZ;
-    }
-
-    geometry.attributes.position.needsUpdate = true;
-
-    // Mise à jour des particules de bordure si elles existent
-    if (borderParticles) {
-        updateBorderParticles();
-    }
-}
-
-// Fonction pour mettre à jour les particules de bordure
-function updateBorderParticles() {
-    const positions = borderParticles.geometry.attributes.position.array;
-    const sizes = borderParticles.geometry.attributes.size.array;
-
-    for (let i = 0; i < config.borderParticleCount; i++) {
-        const i3 = i * 3;
-        const angle = (i / config.borderParticleCount) * Math.PI * 2;
-        const progress = i / (config.borderParticleCount - 1);
-
-        // Calcul de la position Y basée sur les courbes
-        let baseY = 0;
-        for (let phase = 0; phase < config.curvePhases; phase++) {
-            const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            let value = Math.sin(angle * freq + phaseOffsets[phase]);
-            baseY += value * amp;
-        }
-
-        // Ajout d'une variation aléatoire sur Y
-        baseY += (Math.random() * 2 - 1) * heightVariation;
-
-        // Position de base sur le cercle
-        const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
-        positions[i3] = Math.cos(angle) * baseRadius;
-        positions[i3 + 1] = baseY;
-        positions[i3 + 2] = Math.sin(angle) * baseRadius;
-
-        // Mise à jour de la taille des particules
-        const distanceFromBase = Math.abs(((i % 3) - 1) * lineThickness);
-        const normalizedDistance = distanceFromBase / config.borderWidth;
-        sizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
-    }
-
-    borderParticles.geometry.attributes.position.needsUpdate = true;
-    borderParticles.geometry.attributes.size.needsUpdate = true;
 }
 
 // Gestionnaires d'événements pour les contrôles
@@ -960,71 +931,3 @@ function setupControls() {
 
 // Démarrage
 document.addEventListener('DOMContentLoaded', init);
-
-function updateColors() {
-    if (!particles) return;
-    
-    // Recompiler le shader avec la nouvelle valeur de seuil
-    const fragmentShader = `
-        varying float vY;
-        uniform sampler2D pointTexture;
-        
-        void main() {
-            vec2 center = vec2(0.5, 0.5);
-            float dist = length(gl_PointCoord - center);
-            float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
-            
-            vec3 color = vec3(1.0);
-            if (vY > ${config.greenThreshold}) {
-                color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
-            }
-            
-            gl_FragColor = vec4(color, alpha);
-            
-            if (alpha < 0.01) discard;
-        }
-    `;
-    
-    particles.material.fragmentShader = fragmentShader;
-    particles.material.needsUpdate = true;
-
-    // Appliquer également aux particules de bordure
-    if (borderParticles) {
-        const borderFragmentShader = `
-            varying float vY;
-            uniform sampler2D pointTexture;
-            
-            void main() {
-                vec2 center = vec2(0.5, 0.5);
-                float dist = length(gl_PointCoord - center);
-                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
-                
-                vec3 color = vec3(1.0);
-                if (vY > ${config.greenThreshold}) {
-                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
-                }
-                
-                gl_FragColor = vec4(color, alpha);
-                
-                if (alpha < 0.01) discard;
-            }
-        `;
-
-        // Mettre à jour le vertex shader de la bordure pour passer la position Y
-        const borderVertexShader = `
-            attribute float size;
-            varying float vY;
-            
-            void main() {
-                vY = position.y;
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                gl_Position = projectionMatrix * mvPosition;
-                gl_PointSize = size;
-            }
-        `;
-
-        borderParticles.material.vertexShader = borderVertexShader;
-        borderParticles.material.fragmentShader = borderFragmentShader;
-        borderParticles.material.needsUpdate = true;
-    }
-}

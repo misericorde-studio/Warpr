@@ -32,11 +32,6 @@ const config = {
     thicknessVariationMultiplier: 5.0, // Augmenté de 3.0 à 5.0 pour plus de variation d'épaisseur
 };
 
-// Valeurs fixes pour les courbes
-const phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
-const frequencyMultipliers = [1, 0.5, 0.7, 0.3];
-const amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
-
 // Variables globales
 let scene, camera, renderer, controls;
 let particles, borderParticles;
@@ -45,6 +40,16 @@ let container;
 let heightVariation = 0.22;
 let lineThickness = 0.030;
 let lastScrollY = 0;
+
+// Tableaux de positions
+let mainInitialPositions;
+let mainFinalPositions;
+let positions;
+
+// Tableaux de phases
+let phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
+let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
+let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 
 // Fonction de bruit 1D simplifiée
 function noise1D(x) {
@@ -158,34 +163,35 @@ function createParticles() {
         const angle = (i / config.particleCount) * Math.PI * 2;
         const progress = i / (config.particleCount - 1);
 
-        const angleVariation = (Math.random() - 0.5) * 0.1;
+        // Réduction de la variation d'angle pour une distribution plus régulière
+        const angleVariation = (Math.random() - 0.5) * 0.02;
         const finalAngle = angle + angleVariation;
         
-        // Distribution radiale plus aléatoire
-        const randomFactor = Math.random();
-        const layerOffset = (randomFactor - 0.5) * 2; // Valeur entre -1 et 1
+        // Distribution radiale plus régulière avec variation minimale
+        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
+        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
         
-        // État initial : toutes les particules sur le cercle de base
-        const initialRadius = config.radius;
+        // État initial : toutes les particules presque sur le cercle de base
+        const initialRadius = config.radius * (1 + layerOffset * 0.2);
         
-        // État final : variation radiale vers l'intérieur/extérieur
-        const finalRadius = config.radius + (layerOffset * 0.04);
+        // État final : variation radiale légèrement plus prononcée
+        const finalRadius = config.radius * (1 + layerOffset);
 
-        // Positions initiales (toutes sur le cercle de base)
+        // Positions initiales (quasi-régulières sur le cercle)
         const initialX = Math.cos(finalAngle) * initialRadius;
         const initialZ = Math.sin(finalAngle) * initialRadius;
 
-        // Positions finales (déployées radialement)
+        // Positions finales (légèrement plus variées)
         const finalX = Math.cos(finalAngle) * finalRadius;
         const finalZ = Math.sin(finalAngle) * finalRadius;
 
-        // Calcul de la hauteur Y avec distribution aléatoire
+        // Calcul de la hauteur Y avec distribution contrôlée
         const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
         const baseThickness = lineThickness * (1 + thicknessVariation);
-        const randomY = (Math.random() * 2 - 1) * baseThickness; // Distribution aléatoire sur Y
+        const randomY = (Math.random() * 2 - 1) * baseThickness;
         let y = randomY;
         
-        // Ajout des variations de hauteur
+        // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
@@ -197,8 +203,8 @@ function createParticles() {
             y += value * amp;
         }
 
-        // Ajout du bruit avec distribution plus naturelle
-        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
+        // Ajout du bruit avec une influence réduite
+        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
         y += noiseValue * heightVariation;
 
         // Stockage des positions
@@ -484,13 +490,16 @@ function updateScroll() {
     }
 }
 
+// Fonction pour mettre à jour les positions des particules
 function updateParticles() {
     if (!particles) return;
-    
-    const geometry = particles.geometry;
-    const positions = geometry.attributes.position.array;
 
-    // Utilisation des mêmes valeurs fixes
+    const geometry = particles.geometry;
+    positions = geometry.attributes.position.array;
+    mainInitialPositions = new Float32Array(config.particleCount * 3);
+    mainFinalPositions = new Float32Array(config.particleCount * 3);
+
+    // Valeurs fixes pour la continuité
     const startValues = new Float32Array(config.curvePhases);
     const endValues = new Float32Array(config.curvePhases);
     for (let phase = 0; phase < config.curvePhases; phase++) {
@@ -503,108 +512,108 @@ function updateParticles() {
         const angle = (i / config.particleCount) * Math.PI * 2;
         const progress = i / (config.particleCount - 1);
 
-        // Ajout d'une variation aléatoire à l'angle
-        const angleVariation = (Math.random() - 0.5) * 0.1;
+        // Réduction de la variation d'angle pour une distribution plus régulière
+        const angleVariation = (Math.random() - 0.5) * 0.02;
         const finalAngle = angle + angleVariation;
+        
+        // Distribution radiale plus régulière avec variation minimale
+        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
+        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
+        
+        // État initial : toutes les particules presque sur le cercle de base
+        const initialRadius = config.radius * (1 + layerOffset * 0.2);
+        
+        // État final : variation radiale légèrement plus prononcée
+        const finalRadius = config.radius * (1 + layerOffset);
 
-        // Calcul du rayon de base avec une légère variation
-        const radiusVariation = (Math.random() - 0.5) * 0.1;
-        const baseRadius = config.radius * (1 + radiusVariation);
-        
-        // Calcul de la position de base
-        const x = Math.cos(finalAngle) * baseRadius;
-        const z = Math.sin(finalAngle) * baseRadius;
-        
-        // Distribution plus dense sur Y avec 5 couches au lieu de 3
-        const layerIndex = i % 5; // 5 couches au lieu de 3
-        const layerOffset = (layerIndex - 2) / 2; // Répartition entre -1 et 1
-        
-        // Variation d'épaisseur plus prononcée basée sur l'angle
-        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * config.thicknessVariationMultiplier;
+        // Positions initiales (quasi-régulières sur le cercle)
+        const initialX = Math.cos(finalAngle) * initialRadius;
+        const initialZ = Math.sin(finalAngle) * initialRadius;
+
+        // Positions finales (légèrement plus variées)
+        const finalX = Math.cos(finalAngle) * finalRadius;
+        const finalZ = Math.sin(finalAngle) * finalRadius;
+
+        // Calcul de la hauteur Y avec distribution contrôlée
+        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
         const baseThickness = lineThickness * (1 + thicknessVariation);
+        const randomY = (Math.random() * 2 - 1) * baseThickness;
+        let y = randomY;
         
-        // Ajout d'une variation aléatoire à l'épaisseur
-        const thicknessNoise = (Math.random() - 0.5) * 0.4;
-        let y = layerOffset * baseThickness * (1 + thicknessNoise);
-        
-        // Ajout des variations de hauteur avec amplitude réduite
+        // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = (heightVariation * 0.7) * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            
+            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
             let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
-            
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
                 value = value * (1 - blend) + startValues[phase] * blend;
             }
-            
             y += value * amp;
         }
-        
-        // Ajout du bruit avec moins de variation
-        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3 + (Math.random() - 0.5) * 0.2;
-        y += noiseValue * (heightVariation * 0.7);
-        
-        positions[i3] = x;
+
+        // Ajout du bruit avec une influence réduite
+        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
+        y += noiseValue * heightVariation;
+
+        // Mise à jour des positions
+        mainInitialPositions[i3] = initialX;
+        mainInitialPositions[i3 + 1] = y;
+        mainInitialPositions[i3 + 2] = initialZ;
+
+        mainFinalPositions[i3] = finalX;
+        mainFinalPositions[i3 + 1] = y;
+        mainFinalPositions[i3 + 2] = finalZ;
+
+        positions[i3] = initialX;
         positions[i3 + 1] = y;
-        positions[i3 + 2] = z;
+        positions[i3 + 2] = initialZ;
     }
 
     geometry.attributes.position.needsUpdate = true;
 
-    // Mise à jour des positions des particules de la bordure
+    // Mise à jour des particules de bordure si elles existent
     if (borderParticles) {
-        const borderPositions = borderParticles.geometry.attributes.position.array;
-        const borderSizes = borderParticles.geometry.attributes.size.array;
-        
-        for (let i = 0; i < config.borderParticleCount; i++) {
-            const i3 = i * 3;
-            const angle = (i / config.borderParticleCount) * Math.PI * 2;
-            const progress = i / (config.borderParticleCount - 1);
-
-            const radialAngle = Math.random() * Math.PI * 2;
-            const radialOffset = Math.random() * config.borderWidth;
-            
-            let baseY = 0;
-            for (let phase = 0; phase < config.curvePhases; phase++) {
-                const freq = config.curveFrequency * frequencyMultipliers[phase];
-                const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-                
-                let value = Math.sin(angle * freq + phaseOffsets[phase]);
-                
-                if (progress > 0.95) {
-                    const blend = (progress - 0.95) / 0.05;
-                    value = value * (1 - blend) + startValues[phase] * blend;
-                }
-                
-                baseY += value * amp;
-            }
-
-            const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
-            baseY += noiseValue * heightVariation;
-
-            const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
-            const baseX = Math.cos(angle) * baseRadius;
-            const baseZ = Math.sin(angle) * baseRadius;
-
-            const offsetX = Math.cos(radialAngle) * radialOffset;
-            const offsetY = (Math.random() - 0.5) * config.borderWidth;
-            const offsetZ = Math.sin(radialAngle) * radialOffset;
-
-            borderPositions[i3] = baseX + offsetX;
-            borderPositions[i3 + 1] = baseY + offsetY;
-            borderPositions[i3 + 2] = baseZ + offsetZ;
-
-            // Mise à jour de la taille des particules
-            const distanceFromBase = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
-            const normalizedDistance = Math.min(distanceFromBase / config.borderWidth, 1);
-            borderSizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
-        }
-        
-        borderParticles.geometry.attributes.position.needsUpdate = true;
-        borderParticles.geometry.attributes.size.needsUpdate = true;
+        updateBorderParticles();
     }
+}
+
+// Fonction pour mettre à jour les particules de bordure
+function updateBorderParticles() {
+    const positions = borderParticles.geometry.attributes.position.array;
+    const sizes = borderParticles.geometry.attributes.size.array;
+
+    for (let i = 0; i < config.borderParticleCount; i++) {
+        const i3 = i * 3;
+        const angle = (i / config.borderParticleCount) * Math.PI * 2;
+        const progress = i / (config.borderParticleCount - 1);
+
+        // Calcul de la position Y basée sur les courbes
+        let baseY = 0;
+        for (let phase = 0; phase < config.curvePhases; phase++) {
+            const freq = config.curveFrequency * frequencyMultipliers[phase];
+            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            let value = Math.sin(angle * freq + phaseOffsets[phase]);
+            baseY += value * amp;
+        }
+
+        // Ajout d'une variation aléatoire sur Y
+        baseY += (Math.random() * 2 - 1) * heightVariation;
+
+        // Position de base sur le cercle
+        const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
+        positions[i3] = Math.cos(angle) * baseRadius;
+        positions[i3 + 1] = baseY;
+        positions[i3 + 2] = Math.sin(angle) * baseRadius;
+
+        // Mise à jour de la taille des particules
+        const distanceFromBase = Math.abs(((i % 3) - 1) * lineThickness);
+        const normalizedDistance = distanceFromBase / config.borderWidth;
+        sizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
+    }
+
+    borderParticles.geometry.attributes.position.needsUpdate = true;
+    borderParticles.geometry.attributes.size.needsUpdate = true;
 }
 
 // Gestionnaires d'événements pour les contrôles
@@ -612,8 +621,10 @@ function setupControls() {
     // Récupération des éléments de contrôle
     const curveCountControl = document.getElementById('curve-count');
     const curveCountValue = document.getElementById('curve-count-value');
-    const particleSizeControl = document.getElementById('particle-size');
-    const particleSizeValue = document.getElementById('particle-size-value');
+    const mainParticleSizeControl = document.getElementById('main-particle-size');
+    const mainParticleSizeValue = document.getElementById('main-particle-size-value');
+    const borderParticleSizeControl = document.getElementById('border-particle-size');
+    const borderParticleSizeValue = document.getElementById('border-particle-size-value');
     const particleCountControl = document.getElementById('particle-count');
     const particleCountValue = document.getElementById('particle-count-value');
     const curveAmplitudeControl = document.getElementById('curve-amplitude');
@@ -639,16 +650,59 @@ function setupControls() {
 
     // Gestionnaires d'événements pour les contrôles
     curveCountControl.addEventListener('input', (e) => {
-        config.curveFrequency = parseInt(e.target.value);
-        curveCountValue.textContent = config.curveFrequency;
+        const value = parseInt(e.target.value);
+        config.curveFrequency = value;
+        config.curvePhases = Math.max(2, Math.min(4, Math.floor(value / 3))); // Ajuste le nombre de phases en fonction de la fréquence
+        
+        // Réinitialisation des tableaux avec la nouvelle taille
+        phaseOffsets = new Array(config.curvePhases);
+        frequencyMultipliers = new Array(config.curvePhases);
+        amplitudeMultipliers = new Array(config.curvePhases);
+        
+        // Mise à jour des tableaux de phases
+        const phaseStep = (Math.PI * 2) / config.curvePhases;
+        for (let i = 0; i < config.curvePhases; i++) {
+            phaseOffsets[i] = i * phaseStep;
+            frequencyMultipliers[i] = 1 - (i * 0.2); // Décroissance progressive des fréquences
+            amplitudeMultipliers[i] = 1 - (i * 0.2); // Décroissance progressive des amplitudes
+        }
+        
+        curveCountValue.textContent = value;
         updateParticles();
     });
 
-    particleSizeControl.addEventListener('input', (e) => {
+    mainParticleSizeControl.addEventListener('input', (e) => {
         config.particleSize = parseFloat(e.target.value);
-        particleSizeValue.textContent = config.particleSize.toFixed(2);
+        mainParticleSizeValue.textContent = config.particleSize.toFixed(2);
         if (particles) {
             particles.material.size = config.particleSize;
+        }
+    });
+
+    borderParticleSizeControl.addEventListener('input', (e) => {
+        const size = parseFloat(e.target.value);
+        borderParticleSizeValue.textContent = size.toFixed(2);
+        if (borderParticles) {
+            config.borderParticleMaxSize = size * 1.2;
+            config.borderParticleMinSize = size * 0.8;
+            const positions = borderParticles.geometry.attributes.position.array;
+            const sizes = borderParticles.geometry.attributes.size.array;
+            
+            for (let i = 0; i < config.borderParticleCount; i++) {
+                const i3 = i * 3;
+                const baseX = positions[i3];
+                const baseY = positions[i3 + 1];
+                const baseZ = positions[i3 + 2];
+                
+                const distanceFromBase = Math.sqrt(
+                    Math.pow(baseX - Math.cos(Math.atan2(baseZ, baseX)) * config.radius, 2) +
+                    Math.pow(baseZ - Math.sin(Math.atan2(baseZ, baseX)) * config.radius, 2)
+                );
+                const normalizedDistance = Math.min(distanceFromBase / config.borderWidth, 1);
+                sizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
+            }
+            
+            borderParticles.geometry.attributes.size.needsUpdate = true;
         }
     });
 
@@ -658,8 +712,11 @@ function setupControls() {
         // Recréer les particules avec le nouveau compte
         if (particles) {
             scene.remove(particles);
-            createParticles();
         }
+        if (borderParticles) {
+            scene.remove(borderParticles);
+        }
+        createParticles();
     });
 
     curveAmplitudeControl.addEventListener('input', (e) => {
@@ -677,7 +734,6 @@ function setupControls() {
     minThicknessControl.addEventListener('input', (e) => {
         const minThickness = parseFloat(e.target.value);
         minThicknessValue.textContent = minThickness.toFixed(3);
-        // Mettre à jour la configuration avec la nouvelle épaisseur minimale
         config.borderParticleMinSize = minThickness * 100;
         updateParticles();
     });

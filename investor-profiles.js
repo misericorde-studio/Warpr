@@ -835,6 +835,8 @@ function setupControls() {
     const controlsPanel = document.getElementById('controls-panel');
     const greenThresholdControl = document.getElementById('green-threshold');
     const greenThresholdValue = document.getElementById('green-threshold-value');
+    const cameraFarControl = document.getElementById('camera-far');
+    const cameraFarValue = document.getElementById('camera-far-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -941,6 +943,18 @@ function setupControls() {
         config.greenThreshold = parseFloat(e.target.value);
         greenThresholdValue.textContent = config.greenThreshold.toFixed(2);
         updateColors();
+    });
+
+    cameraFarControl.addEventListener('input', (e) => {
+        const farValue = parseFloat(e.target.value);
+        config.initialFar = farValue;
+        config.finalFar = farValue * 1.5; // Maintient le ratio entre initialFar et finalFar
+        cameraFarValue.textContent = farValue.toFixed(1);
+        
+        // Met à jour la caméra immédiatement
+        camera.far = farValue;
+        camera.near = Math.max(0.1, farValue * 0.1); // Ajuste aussi le near pour éviter les problèmes de rendu
+        camera.updateProjectionMatrix();
     });
 }
 

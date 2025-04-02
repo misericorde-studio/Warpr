@@ -33,6 +33,14 @@ const config = {
     borderParticleMinSize: 6.80,
     borderColor: 0xFFFFFF,
     thicknessVariationMultiplier: 5.0,
+    // Configuration du rectangle vert
+    greenLine: {
+        posX: 0,
+        posY: 0,
+        posZ: -1.50,
+        width: 4,
+        height: 0.02
+    }
 };
 
 // Variables globales
@@ -61,6 +69,7 @@ let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 
 // Ajouter ces variables au début du fichier
 let progressBar, progressValue;
+let planeMesh;
 
 // Fonction de bruit 1D simplifiée
 function noise1D(x) {
@@ -164,6 +173,28 @@ function init() {
     // Animation avec timestamp
     lastFrameTime = performance.now();
     animate(lastFrameTime);
+
+    // Création du plan vert
+    const planeGeometry = new THREE.PlaneGeometry(config.radius * config.greenLine.width, config.greenLine.height);
+    const planeMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00FEA5,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+        renderOrder: 999
+    });
+    
+    planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    planeMesh.position.set(
+        config.greenLine.posX,
+        config.greenLine.posY,
+        config.greenLine.posZ
+    );
+    planeMesh.scale.x = (container.clientWidth / 1920) * 2;
+    planeMesh.frustumCulled = false;
+    scene.add(planeMesh);
 }
 
 // Animation optimisée
@@ -1024,6 +1055,38 @@ function setupControls() {
         clipPlanePositionValue.textContent = config.clipPlanePosition.toFixed(2);
         updateClipPlane();
     });
+
+    // Contrôles pour le rectangle vert
+    const greenLinePosXControl = document.getElementById('green-line-pos-x');
+    const greenLinePosYControl = document.getElementById('green-line-pos-y');
+    const greenLinePosZControl = document.getElementById('green-line-pos-z');
+    const greenLinePosXValue = document.getElementById('green-line-pos-x-value');
+    const greenLinePosYValue = document.getElementById('green-line-pos-y-value');
+    const greenLinePosZValue = document.getElementById('green-line-pos-z-value');
+
+    if (greenLinePosXControl) {
+        greenLinePosXControl.addEventListener('input', (e) => {
+            config.greenLine.posX = parseFloat(e.target.value);
+            greenLinePosXValue.textContent = config.greenLine.posX.toFixed(2);
+            if (planeMesh) planeMesh.position.x = config.greenLine.posX;
+        });
+    }
+
+    if (greenLinePosYControl) {
+        greenLinePosYControl.addEventListener('input', (e) => {
+            config.greenLine.posY = parseFloat(e.target.value);
+            greenLinePosYValue.textContent = config.greenLine.posY.toFixed(2);
+            if (planeMesh) planeMesh.position.y = config.greenLine.posY;
+        });
+    }
+
+    if (greenLinePosZControl) {
+        greenLinePosZControl.addEventListener('input', (e) => {
+            config.greenLine.posZ = parseFloat(e.target.value);
+            greenLinePosZValue.textContent = config.greenLine.posZ.toFixed(2);
+            if (planeMesh) planeMesh.position.z = config.greenLine.posZ;
+        });
+    }
 }
 
 // Démarrage

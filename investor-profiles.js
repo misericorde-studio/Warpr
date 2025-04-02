@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     radius: 1.5,
     particleCount: 2600,
-    particleSize: 9.60,
+    particleSize: 12.60,
     curveAmplitude: 0.4,
     curveFrequency: 9,
     curvePhases: 4,
@@ -27,9 +27,9 @@ const config = {
     // Configuration de la bordure
     borderWidth: 0.4,
     borderParticleCount: 2000,
-    borderParticleSize: 4.70,
-    borderParticleMaxSize: 4.70,
-    borderParticleMinSize: 4.70,
+    borderParticleSize: 6.80,
+    borderParticleMaxSize: 6.80,
+    borderParticleMinSize: 6.80,
     borderColor: 0xFFFFFF,
     thicknessVariationMultiplier: 5.0,
 };
@@ -766,8 +766,8 @@ function updateScroll() {
                 const mainInitialPos = particles.geometry.attributes.initialPosition.array;
                 
                 // Mise à jour d'un sous-ensemble de particules principales
-                const particlesPerBatch = Math.ceil(mainPositions.length / 15); // 5 lots de particules (1/3 des particules tous les 5%)
-                const batchIndex = Math.floor((scrollProgress / 5) % 5); // 0 à 4
+                const particlesPerBatch = Math.ceil(mainPositions.length / 15);
+                const batchIndex = Math.floor((scrollProgress / 5) % 5);
                 const startIdx = batchIndex * particlesPerBatch * 3;
                 const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
                 
@@ -778,15 +778,29 @@ function updateScroll() {
                 }
                 particles.geometry.attributes.position.needsUpdate = true;
                 
-                // Réinitialiser toutes les particules de bordure
+                // Réinitialiser toutes les particules de bordure avec une transition plus douce
                 if (borderParticles && borderParticles.geometry) {
                     const positions = borderParticles.geometry.attributes.position.array;
                     const initialPos = borderParticles.geometry.attributes.initialPosition.array;
                     
+                    // Calculer un facteur de transition basé sur le scroll
+                    const transitionFactor = Math.max(0, Math.min(1, scrollProgress / 5));
+                    
                     for (let i = 0; i < positions.length; i += 3) {
-                        positions[i] = initialPos[i];
-                        positions[i + 1] = initialPos[i + 1];
-                        positions[i + 2] = initialPos[i + 2];
+                        // Position actuelle
+                        const currentX = positions[i];
+                        const currentY = positions[i + 1];
+                        const currentZ = positions[i + 2];
+                        
+                        // Position initiale
+                        const targetX = initialPos[i];
+                        const targetY = initialPos[i + 1];
+                        const targetZ = initialPos[i + 2];
+                        
+                        // Interpolation douce entre la position actuelle et la position initiale
+                        positions[i] = currentX + (targetX - currentX) * transitionFactor;
+                        positions[i + 1] = currentY + (targetY - currentY) * transitionFactor;
+                        positions[i + 2] = currentZ + (targetZ - currentZ) * transitionFactor;
                     }
                     borderParticles.geometry.attributes.position.needsUpdate = true;
                 }

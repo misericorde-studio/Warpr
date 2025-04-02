@@ -1140,6 +1140,42 @@ function updateScroll() {
     }
 }
 
+// Fonction pour mettre à jour les particules
+function updateParticles() {
+    // Sauvegarder les tailles actuelles des particules
+    const currentMainSize = particles ? particles.material.uniforms.pointSize.value : config.particleSize;
+    const currentBorderSize = borderParticles ? borderParticles.material.uniforms.pointSize.value : config.borderParticleSize;
+
+    // Supprimer les particules existantes
+    if (particles) {
+        particles.geometry.dispose();
+        particles.material.dispose();
+        scene.remove(particles);
+    }
+    if (borderParticles) {
+        borderParticles.geometry.dispose();
+        borderParticles.material.dispose();
+        scene.remove(borderParticles);
+    }
+
+    // Sauvegarder temporairement les valeurs de configuration
+    const originalMainSize = config.particleSize;
+    const originalBorderSize = config.borderParticleSize;
+    
+    // Appliquer les tailles actuelles
+    config.particleSize = currentMainSize;
+    config.borderParticleSize = currentBorderSize;
+    config.borderParticleMaxSize = currentBorderSize;
+    config.borderParticleMinSize = currentBorderSize;
+
+    // Recréer les particules avec les nouveaux paramètres
+    createParticles();
+
+    // Restaurer les valeurs de configuration originales
+    config.particleSize = originalMainSize;
+    config.borderParticleSize = originalBorderSize;
+}
+
 // Gestionnaires d'événements pour les contrôles
 function setupControls() {
     // Récupération des éléments de contrôle
@@ -1232,6 +1268,7 @@ function setupControls() {
     particleCountControl.addEventListener('input', (e) => {
         const value = parseInt(e.target.value);
         config.particleCount = value;
+        config.borderParticleCount = Math.floor(value * 0.77); // Maintient le ratio entre particules principales et bordure
         particleCountValue.textContent = value;
         updateParticles();
     });

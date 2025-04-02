@@ -38,7 +38,7 @@ const config = {
         posX: 0,
         posY: 0,
         posZ: -1.50,
-        width: 4,
+        width: 32, // Pourcentage de la largeur du viewport
         height: 0.02
     }
 };
@@ -175,7 +175,9 @@ function init() {
     animate(lastFrameTime);
 
     // Création du plan vert
-    const planeGeometry = new THREE.PlaneGeometry(config.radius * config.greenLine.width, config.greenLine.height);
+    const viewWidth = camera.right - camera.left;
+    const planeWidth = (viewWidth * config.greenLine.width) / 100; // Utilise le pourcentage de la config
+    const planeGeometry = new THREE.PlaneGeometry(planeWidth, config.greenLine.height);
     const planeMaterial = new THREE.MeshBasicMaterial({
         color: 0x00FEA5,
         transparent: true,
@@ -192,7 +194,6 @@ function init() {
         config.greenLine.posY,
         config.greenLine.posZ
     );
-    planeMesh.scale.x = (container.clientWidth / 1920) * 2;
     planeMesh.frustumCulled = false;
     scene.add(planeMesh);
 }
@@ -867,14 +868,22 @@ function updateScroll() {
         }
 
         // Gestion du zoom et de la distance max
-        if (animationProgress < 40) {  // Modifié de 60% à 40%
-            // En dessous de 40%, on force le zoom initial
+        if (animationProgress < 40) {  // En dessous de 40%
             camera.zoom = config.initialZoom;
             camera.far = config.initialFar;
             camera.near = Math.max(0.1, config.initialFar * 0.1);
             camera.updateProjectionMatrix();
-        } else if (animationProgress >= 40 && animationProgress <= 80) {  // Modifié de 60-80% à 40-80%
-            const progress = (animationProgress - 40) / 40;  // 0 à 1 entre 40% et 80% (modifié de 60-80% à 40-80%)
+            
+            // Ajuster l'échelle du rectangle pour le zoom initial
+            if (planeMesh) {
+                planeMesh.scale.set(
+                    (container.clientWidth / 1920) * 2,
+                    1,
+                    1
+                );
+            }
+        } else if (animationProgress >= 40 && animationProgress <= 80) {
+            const progress = (animationProgress - 40) / 40;
             
             // Animation de la distance max
             const newFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
@@ -884,21 +893,37 @@ function updateScroll() {
             // Animation du zoom avec direction
             let newZoom;
             if (scrollingUp) {
-                // En remontant : de finalZoom vers initialZoom
                 newZoom = config.finalZoom + (config.initialZoom - config.finalZoom) * (1 - progress);
             } else {
-                // En descendant : de initialZoom vers finalZoom
                 newZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
             }
             camera.zoom = newZoom;
-            
             camera.updateProjectionMatrix();
+            
+            // Ajuster l'échelle du rectangle pour compenser le zoom
+            if (planeMesh) {
+                const scaleCompensation = config.initialZoom / newZoom;
+                planeMesh.scale.set(
+                    (container.clientWidth / 1920) * 2 * scaleCompensation,
+                    1,
+                    1
+                );
+            }
         } else {
-            // Au-delà de 80%, on maintient les valeurs finales
             camera.zoom = config.finalZoom;
             camera.far = config.finalFar;
             camera.near = Math.max(0.1, config.finalFar * 0.1);
             camera.updateProjectionMatrix();
+            
+            // Ajuster l'échelle du rectangle pour le zoom final
+            if (planeMesh) {
+                const scaleCompensation = config.initialZoom / config.finalZoom;
+                planeMesh.scale.set(
+                    (container.clientWidth / 1920) * 2 * scaleCompensation,
+                    1,
+                    1
+                );
+            }
         }
 
         // S'assurer que le point de pivot reste au centre
@@ -1085,6 +1110,27 @@ function setupControls() {
             config.greenLine.posZ = parseFloat(e.target.value);
             greenLinePosZValue.textContent = config.greenLine.posZ.toFixed(2);
             if (planeMesh) planeMesh.position.z = config.greenLine.posZ;
+        });
+    }
+
+    // Contrôle de la largeur du rectangle vert
+    const greenLineWidthControl = document.getElementById('green-line-width');
+    const greenLineWidthValue = document.getElementById('green-line-width-value');
+
+    if (greenLineWidthControl) {
+        greenLineWidthControl.addEventListener('input', (e) => {
+            const widthPercent = parseFloat(e.target.value);
+            greenLineWidthValue.textContent = widthPercent;
+            
+            // Calculer la largeur en unités Three.js basée sur le pourcentage
+            const viewWidth = camera.right - camera.left;
+            const newWidth = (viewWidth * widthPercent) / 100;
+            
+            // Mettre à jour la géométrie du plan
+            if (planeMesh) {
+                planeMesh.geometry.dispose();
+                planeMesh.geometry = new THREE.PlaneGeometry(newWidth, config.greenLine.height);
+            }
         });
     }
 }

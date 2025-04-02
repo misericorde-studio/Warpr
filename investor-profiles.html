@@ -363,9 +363,6 @@
 
     <div class="airdrop">
         <div class="airdrop_left">
-            <div class="threshold-line-container">
-                <div class="threshold-line"></div>
-            </div>
             <div class="vertical-lines-wrapper">
                 <div class="vertical-line"></div>
                 <div class="vertical-line"></div>
@@ -511,6 +508,20 @@
             </div>
         </div>
         <div class="control-group">
+            <label for="clip-plane-height">Hauteur du plan de référence</label>
+            <div class="slider-container">
+                <input type="range" id="clip-plane-height" min="0" max="1" step="0.01" value="0.5">
+                <span class="control-value" id="clip-plane-height-value">0.50</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <label for="clip-plane-position">Position du plan de référence</label>
+            <div class="slider-container">
+                <input type="range" id="clip-plane-position" min="-1" max="1" step="0.01" value="0">
+                <span class="control-value" id="clip-plane-position-value">0.00</span>
+            </div>
+        </div>
+        <div class="control-group">
             <button id="toggle-controls">Masquer les contrôles</button>
         </div>
     </div>
@@ -528,27 +539,21 @@
     <script src="https://unpkg.com/lenis@1.2.3/dist/lenis.min.js"></script> 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            const lenis = new Lenis();
-            const progressBar = document.querySelector('.loading-progress-bar');
-            const progressValue = document.querySelector('.loading-progress-value');
+            const lenis = new Lenis({
+                duration: 1.2,
+                easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+                orientation: 'vertical',
+                gestureOrientation: 'vertical',
+                smoothWheel: true,
+                wheelMultiplier: 1,
+                smoothTouch: false,
+                touchMultiplier: 2,
+                infinite: false,
+            });
 
-            function updateProgress() {
-                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-                const scrolled = window.scrollY;
-                const progress = Math.min(100, Math.round((scrolled / scrollHeight) * 100));
-                
-                progressBar.style.setProperty('--progress', `${progress}%`);
-                progressValue.textContent = `[ ${progress}% ]`;
-            }
-    
-            function raf(time) {
-                lenis.raf(time);
-                updateProgress();
-
-                requestAnimationFrame(raf);
-            }
-    
-            requestAnimationFrame(raf);
+            // Supprime l'ancien RAF de Lenis
+            // La mise à jour sera faite dans le RAF de Three.js
+            window.lenis = lenis; // Rend lenis accessible globalement
         });
     </script>
 </body>

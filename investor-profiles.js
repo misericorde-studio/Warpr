@@ -23,7 +23,8 @@ const config = {
     cameraFar: 2.2,
     initialFar: 2.2,
     finalFar: 4.5,
-    greenThreshold: 0.01,
+    clipPlaneHeight: 0.5, // 50% de la hauteur initiale
+    clipPlanePosition: 0.5, // Position initiale en haut (NDC y va de -1 à 1)
     // Configuration de la bordure
     borderWidth: 0.4,
     borderParticleCount: 2000,
@@ -57,6 +58,9 @@ let positions;
 let phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
 let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
 let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
+
+// Ajouter ces variables au début du fichier
+let progressBar, progressValue;
 
 // Fonction de bruit 1D simplifiée
 function noise1D(x) {
@@ -121,6 +125,10 @@ function init() {
     // Horloge
     clock = new THREE.Clock();
 
+    // Cache les éléments de progression
+    progressBar = document.querySelector('.loading-progress-bar');
+    progressValue = document.querySelector('.loading-progress-value');
+
     // Création des particules
     createParticles();
     
@@ -162,13 +170,28 @@ function init() {
 function animate(timestamp) {
     requestAnimationFrame(animate);
     
-    // Limiter le framerate à ~60fps
+    // Mise à jour de Lenis
+    if (window.lenis) {
+        window.lenis.raf(timestamp);
+    }
+    
+    // Mise à jour de la barre de progression
+    if (progressBar && progressValue) {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrolled = window.scrollY;
+        const progress = Math.min(100, Math.round((scrolled / scrollHeight) * 100));
+        
+        progressBar.style.setProperty('--progress', `${progress}%`);
+        progressValue.textContent = `[ ${progress}% ]`;
+    }
+    
+    // Limite le framerate à ~60fps
     if (timestamp - lastFrameTime < 16) {
         return;
     }
     lastFrameTime = timestamp;
     
-    // Rendu de la scène principale
+    // Rendu de la scène
     renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
     renderer.setClearColor(config.backgroundColor);
     renderer.render(scene, camera);
@@ -341,31 +364,44 @@ function createParticles() {
         uniforms: {
             pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.particleSize },
-            scaleFactor: { value: 1.0 }
+            scaleFactor: { value: 1.0 },
+            clipPlaneHeight: { value: config.clipPlaneHeight },
+            clipPlanePosition: { value: config.clipPlanePosition }
         },
         vertexShader: `
             uniform float pointSize;
             uniform float scaleFactor;
-            varying float vY;
+            uniform float clipPlaneHeight;
+            uniform float clipPlanePosition;
+            
+            varying vec4 vClipPos;
             
             void main() {
-                vY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
+                vClipPos = gl_Position;
                 gl_PointSize = pointSize * scaleFactor;
             }
         `,
         fragmentShader: `
-            varying float vY;
+            uniform float clipPlaneHeight;
+            uniform float clipPlanePosition;
             uniform sampler2D pointTexture;
+            
+            varying vec4 vClipPos;
             
             void main() {
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
                 
+                // Normaliser la position dans l'espace de clip
+                vec3 ndc = vClipPos.xyz / vClipPos.w;
+                
                 vec3 color = vec3(1.0);
-                if (vY > ${config.greenThreshold}) {
+                // Si la particule est dans la zone verte (au-dessus de clipPlanePosition - clipPlaneHeight)
+                float planeBottom = clipPlanePosition - clipPlaneHeight;
+                if (ndc.y >= planeBottom) {
                     color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
@@ -463,31 +499,44 @@ function createParticles() {
         uniforms: {
             pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.borderParticleSize },
-            scaleFactor: { value: 1.0 }
+            scaleFactor: { value: 1.0 },
+            clipPlaneHeight: { value: config.clipPlaneHeight },
+            clipPlanePosition: { value: config.clipPlanePosition }
         },
         vertexShader: `
             uniform float pointSize;
             uniform float scaleFactor;
-            varying float vY;
+            uniform float clipPlaneHeight;
+            uniform float clipPlanePosition;
+            
+            varying vec4 vClipPos;
             
             void main() {
-                vY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
+                vClipPos = gl_Position;
                 gl_PointSize = pointSize * scaleFactor;
             }
         `,
         fragmentShader: `
-            varying float vY;
+            uniform float clipPlaneHeight;
+            uniform float clipPlanePosition;
             uniform sampler2D pointTexture;
+            
+            varying vec4 vClipPos;
             
             void main() {
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
                 
+                // Normaliser la position dans l'espace de clip
+                vec3 ndc = vClipPos.xyz / vClipPos.w;
+                
                 vec3 color = vec3(1.0);
-                if (vY > ${config.greenThreshold}) {
+                // Si la particule est dans la zone verte (au-dessus de clipPlanePosition - clipPlaneHeight)
+                float planeBottom = clipPlanePosition - clipPlaneHeight;
+                if (ndc.y >= planeBottom) {
                     color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
@@ -591,25 +640,17 @@ function throttle(func, limit) {
 }
 
 // Optimisation de la mise à jour des couleurs
-function updateColors() {
+function updateClipPlane() {
     if (!particles) return;
     
-    // Utiliser le remplacement de texte plutôt que de recompiler tout le shader
-    if (particles.material && particles.material.fragmentShader) {
-        particles.material.fragmentShader = particles.material.fragmentShader.replace(
-            /if \(vY > ([-0-9.]+)\)/,
-            `if (vY > ${config.greenThreshold})`
-        );
-        particles.material.needsUpdate = true;
+    if (particles.material && particles.material.uniforms) {
+        particles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
+        particles.material.uniforms.clipPlanePosition.value = config.clipPlanePosition;
     }
 
-    // Même chose pour les particules de bordure
-    if (borderParticles && borderParticles.material && borderParticles.material.fragmentShader) {
-        borderParticles.material.fragmentShader = borderParticles.material.fragmentShader.replace(
-            /if \(vY > ([-0-9.]+)\)/,
-            `if (vY > ${config.greenThreshold})`
-        );
-        borderParticles.material.needsUpdate = true;
+    if (borderParticles && borderParticles.material && borderParticles.material.uniforms) {
+        borderParticles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
+        borderParticles.material.uniforms.clipPlanePosition.value = config.clipPlanePosition;
     }
 }
 
@@ -634,51 +675,37 @@ function updateScroll() {
     const scrollingUp = currentScrolled < lastScrollY;
     lastScrollY = currentScrolled;
 
-    // Animation du seuil en fonction du scroll
-    let newThreshold;
-    if (scrollProgress <= 60) {
-        // De 0 à 60% : animation du threshold de 0.01 à 0.17
-        const progress = scrollProgress / 60;
-        newThreshold = 0.01 + (0.17 - 0.01) * progress;
+    // Animation du plan en fonction du scroll
+    if (scrollProgress <= 32) {
+        // De 0 à 32% : maintient 50% de hauteur
+        config.clipPlaneHeight = 0.5;
+        config.clipPlanePosition = 0.5;
         
-        // Mise à jour de la position de la barre horizontale
-        const heightProgress = progress;
-        const position = 46 - (heightProgress * 4.5); // Remontée jusqu'à 41.5%
-        updateThresholdLine(position, '56%', '1');
-    } else if (scrollProgress <= 72) {
-        // De 60% à 72% : descente progressive de la barre de 41.5% à 70%
-        const progress = (scrollProgress - 60) / 12; // Progression sur 12% de scroll
+    } else if (scrollProgress <= 40) {
+        // De 32% à 40% : réduction à 40% de hauteur
+        const progress = (scrollProgress - 32) / 8;
+        config.clipPlaneHeight = 0.5 - (progress * 0.1); // De 50% à 40%
+        config.clipPlanePosition = 0.5;
         
-        // Animation du threshold sur toute la période 60-74%
-        const thresholdProgress = (scrollProgress - 60) / 14;
-        newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
+    } else if (scrollProgress <= 46) {
+        // De 40% à 46% : maintient 40% de hauteur
+        config.clipPlaneHeight = 0.4;
+        config.clipPlanePosition = 0.5;
         
-        const position = 41.5 + (progress * 28.5); // Descente progressive de 41.5% à 70%
-        updateThresholdLine(position, '56%', '1');
-    } else if (scrollProgress <= 80) {
-        // De 72% à 80% : rétraction de la barre vers son centre
-        const progress = (scrollProgress - 72) / 8;
+    } else if (scrollProgress <= 52) {
+        // De 46% à 52% : extension à 100% de hauteur
+        const progress = (scrollProgress - 46) / 6;
+        config.clipPlaneHeight = 0.4 + (progress * 0.6); // De 40% à 100%
+        config.clipPlanePosition = 0.5 - (progress * 0.5); // Descend au centre
         
-        // Continue l'animation du threshold jusqu'à 74%
-        if (scrollProgress <= 74) {
-            const thresholdProgress = (scrollProgress - 60) / 14;
-            newThreshold = 0.17 + (-0.51 - 0.17) * thresholdProgress;
-        } else {
-            newThreshold = -0.51; // Threshold fixe à -0.51
-        }
-        
-        updateThresholdLine(70, `${56 * (1 - progress)}%`, `${1 - progress}`);
     } else {
-        // Au-delà de 80%
-        newThreshold = -0.51;
-        updateThresholdLine(70, '0%', '0');
+        // Au-delà de 52% : maintient 100%
+        config.clipPlaneHeight = 1.0;
+        config.clipPlanePosition = 0.0;
     }
 
-    // Mise à jour du seuil de couleur uniquement si la valeur a changé
-    if (Math.abs(config.greenThreshold - newThreshold) > 0.001) {
-        config.greenThreshold = newThreshold;
-        updateColors();
-    }
+    // Mettre à jour les uniforms du plan
+    updateClipPlane();
 
     // Animation des rotations et positions seulement si nous sommes en train de défiler
     if (particles) {
@@ -877,6 +904,10 @@ function setupControls() {
     const greenThresholdValue = document.getElementById('green-threshold-value');
     const cameraFarControl = document.getElementById('camera-far');
     const cameraFarValue = document.getElementById('camera-far-value');
+    const clipPlaneHeightControl = document.getElementById('clip-plane-height');
+    const clipPlaneHeightValue = document.getElementById('clip-plane-height-value');
+    const clipPlanePositionControl = document.getElementById('clip-plane-position');
+    const clipPlanePositionValue = document.getElementById('clip-plane-position-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -967,7 +998,7 @@ function setupControls() {
     greenThresholdControl.addEventListener('input', (e) => {
         config.greenThreshold = parseFloat(e.target.value);
         greenThresholdValue.textContent = config.greenThreshold.toFixed(2);
-        updateColors();
+        updateClipPlane();
     });
 
     cameraFarControl.addEventListener('input', (e) => {
@@ -980,6 +1011,18 @@ function setupControls() {
         camera.far = farValue;
         camera.near = Math.max(0.1, farValue * 0.1); // Ajuste aussi le near pour éviter les problèmes de rendu
         camera.updateProjectionMatrix();
+    });
+
+    clipPlaneHeightControl.addEventListener('input', (e) => {
+        config.clipPlaneHeight = parseFloat(e.target.value);
+        clipPlaneHeightValue.textContent = config.clipPlaneHeight.toFixed(2);
+        updateClipPlane();
+    });
+
+    clipPlanePositionControl.addEventListener('input', (e) => {
+        config.clipPlanePosition = parseFloat(e.target.value);
+        clipPlanePositionValue.textContent = config.clipPlanePosition.toFixed(2);
+        updateClipPlane();
     });
 }
 

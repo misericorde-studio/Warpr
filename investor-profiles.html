@@ -78,15 +78,23 @@
             pointer-events: none;
         }
 
-        .vertical-lines-wrapper {
+        .lines{
             position: absolute;
             z-index: 100;
             height: calc(100% - 3.5rem);
             width: 100%;
             pointer-events: none;
             display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .vertical-lines-wrapper {
+            height: 50%;
+            width: 70%;
+            display: flex;
+            align-items: center;
             justify-content: space-between;
-            padding: 16% 22%;
         }
 
         .threshold-line-container {
@@ -363,22 +371,24 @@
 
     <div class="airdrop">
         <div class="airdrop_left">
-            <div class="vertical-lines-wrapper">
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
-                <div class="vertical-line"></div>
+            <div class="lines">
+                <div class="vertical-lines-wrapper">
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                    <div class="vertical-line"></div>
+                </div>
             </div>
             <div class="crosses-wrapper">
                 <div class="cross cross_1"><img src="img/cross.png" alt="cross"></div>

@@ -209,6 +209,7 @@ function animate(timestamp) {
     }
     
     // Mise à jour de la barre de progression avec le pourcentage de la section airdrop
+    let scrollProgress = 0;
     if (progressBar && progressValue) {
         const airdropSection = document.querySelector('.airdrop');
         const airdropRect = airdropSection.getBoundingClientRect();
@@ -218,27 +219,26 @@ function animate(timestamp) {
         const startPoint = windowHeight * 0.6;
         const sectionTop = airdropRect.top;
         
-        // Si la section n'est pas encore visible, progression à 0
         if (sectionTop > startPoint) {
             progressBar.style.setProperty('--progress', '0%');
             progressValue.textContent = '[ 0% ]';
+            scrollProgress = 0;
         }
-        // Si la section est déjà passée, progression à 100%
         else if (airdropRect.bottom <= 0) {
             progressBar.style.setProperty('--progress', '100%');
             progressValue.textContent = '[ 100% ]';
+            scrollProgress = 100;
         }
-        // Sinon, calculer la progression comme dans updateScroll
         else {
             const totalHeight = airdropRect.height - windowHeight;
             const currentScroll = -airdropRect.top;
             const scrollAtStart = -startPoint;
             const adjustedScroll = currentScroll - scrollAtStart;
             const adjustedTotal = totalHeight - scrollAtStart;
-            const progress = Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
+            scrollProgress = Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
             
-            progressBar.style.setProperty('--progress', `${progress}%`);
-            progressValue.textContent = `[ ${progress}% ]`;
+            progressBar.style.setProperty('--progress', `${scrollProgress}%`);
+            progressValue.textContent = `[ ${scrollProgress}% ]`;
         }
     }
     
@@ -247,6 +247,99 @@ function animate(timestamp) {
         return;
     }
     lastFrameTime = timestamp;
+
+    // Animation des particules principales
+    if (particles && particles.geometry) {
+        const positions = particles.geometry.attributes.position.array;
+        const initialPositions = particles.geometry.attributes.initialPosition.array;
+        const finalPositions = particles.geometry.attributes.finalPosition.array;
+        const radialOffsets = particles.geometry.attributes.radialOffset.array;
+        const time = timestamp * 0.001;
+
+        // Entre 60% et au-delà, on met à jour toutes les particules à chaque frame
+        if (scrollProgress >= 60) {
+            // Calculer l'épaisseur radiale maximale (augmente de 0 à 0.1)
+            const deploymentProgress = Math.min(1, (scrollProgress - 60) / 30);
+            const maxThickness = Math.min(0.1, ((scrollProgress - 60) / 30) * 0.1);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const particleIndex = i / 3;
+                // Position de base avec déploiement progressif
+                const baseX = initialPositions[i] + (finalPositions[i] - initialPositions[i]) * deploymentProgress;
+                const baseZ = initialPositions[i + 2] + (finalPositions[i + 2] - initialPositions[i + 2]) * deploymentProgress;
+
+                // Calculer la direction radiale normalisée
+                const dx = baseX;
+                const dz = baseZ;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                const dirX = dx / dist;
+                const dirZ = dz / dist;
+                
+                // Utiliser l'offset radial pré-calculé
+                const radialOffset = radialOffsets[particleIndex] * maxThickness;
+
+                // Effet de flottement avec vitesse et amplitude augmentées
+                const phase = particleIndex * 0.1;
+                const floatX = Math.sin(time * 0.8 + phase) * 0.008;
+                const floatY = Math.cos(time * 0.7 + phase) * 0.008;
+                const floatZ = Math.sin(time * 0.9 + phase) * 0.008;
+                
+                // Appliquer les deux effets
+                positions[i] = baseX + dirX * radialOffset + floatX;
+                positions[i + 1] = initialPositions[i + 1] + floatY;
+                positions[i + 2] = baseZ + dirZ * radialOffset + floatZ;
+            }
+        } else {
+            // En dessous de 60%, appliquer uniquement l'effet de flottement
+            for (let i = 0; i < positions.length; i += 3) {
+                const particleIndex = i / 3;
+                const phase = particleIndex * 0.1;
+                
+                positions[i] = initialPositions[i] + Math.sin(time * 0.8 + phase) * 0.008;
+                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * 0.7 + phase) * 0.008;
+                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * 0.9 + phase) * 0.008;
+            }
+        }
+        particles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Animation des particules de bordure avec flottement
+    if (borderParticles && borderParticles.geometry) {
+        const positions = borderParticles.geometry.attributes.position.array;
+        const initialPositions = borderParticles.geometry.attributes.initialPosition.array;
+        const finalPositions = borderParticles.geometry.attributes.finalPosition.array;
+        const time = timestamp * 0.001;
+
+        if (scrollProgress >= 60) {
+            const deploymentProgress = Math.min(1, (scrollProgress - 60) / 30);
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const particleIndex = i / 3;
+                const phase = particleIndex * 0.1;
+                
+                // Position de base avec déploiement
+                const baseX = initialPositions[i] + (finalPositions[i] - initialPositions[i]) * deploymentProgress;
+                const baseY = initialPositions[i + 1];
+                const baseZ = initialPositions[i + 2] + (finalPositions[i + 2] - initialPositions[i + 2]) * deploymentProgress;
+                
+                // Ajouter l'effet de flottement avec vitesse et amplitude augmentées
+                positions[i] = baseX + Math.sin(time * 0.8 + phase) * 0.008;
+                positions[i + 1] = baseY + Math.cos(time * 0.7 + phase) * 0.008;
+                positions[i + 2] = baseZ + Math.sin(time * 0.9 + phase) * 0.008;
+            }
+        } else {
+            // En dessous de 60%, appliquer uniquement l'effet de flottement
+            for (let i = 0; i < positions.length; i += 3) {
+                const particleIndex = i / 3;
+                const phase = particleIndex * 0.1;
+                
+                positions[i] = initialPositions[i] + Math.sin(time * 0.8 + phase) * 0.008;
+                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * 0.7 + phase) * 0.008;
+                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * 0.9 + phase) * 0.008;
+            }
+        }
+        borderParticles.geometry.attributes.position.needsUpdate = true;
+    }
     
     // Rendu de la scène
     renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
@@ -417,24 +510,51 @@ function createParticles() {
     geometry.setAttribute('finalPosition', new THREE.BufferAttribute(mainFinalPositions, 3));
     geometry.setAttribute('radialOffset', new THREE.BufferAttribute(radialOffsets, 1));
 
+    // Ajouter après la création des attributs de géométrie dans createParticles()
+    const particleOffsets = new Float32Array(config.particleCount * 3);
+    const particlePhases = new Float32Array(config.particleCount);
+    for (let i = 0; i < config.particleCount; i++) {
+        particlePhases[i] = Math.random() * Math.PI * 2;
+        particleOffsets[i * 3] = (Math.random() - 0.5) * 0.02;     // X offset
+        particleOffsets[i * 3 + 1] = (Math.random() - 0.5) * 0.02; // Y offset
+        particleOffsets[i * 3 + 2] = (Math.random() - 0.5) * 0.02; // Z offset
+    }
+    geometry.setAttribute('offset', new THREE.BufferAttribute(particleOffsets, 3));
+    geometry.setAttribute('phase', new THREE.BufferAttribute(particlePhases, 1));
+
     const material = new THREE.ShaderMaterial({
         uniforms: {
             pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.particleSize },
             scaleFactor: { value: 1.0 },
             clipPlaneHeight: { value: config.clipPlaneHeight },
-            clipPlanePosition: { value: config.clipPlanePosition }
+            clipPlanePosition: { value: config.clipPlanePosition },
+            time: { value: 0.0 }
         },
         vertexShader: `
             uniform float pointSize;
             uniform float scaleFactor;
             uniform float clipPlaneHeight;
             uniform float clipPlanePosition;
+            uniform float time;
+            
+            attribute vec3 offset;
+            attribute float phase;
             
             varying vec4 vClipPos;
             
             void main() {
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                // Calculer le mouvement de flottement
+                float floatAmplitude = 0.015;
+                vec3 floatOffset = vec3(
+                    sin(time * 0.5 + phase) * offset.x,
+                    cos(time * 0.4 + phase) * offset.y,
+                    sin(time * 0.6 + phase) * offset.z
+                ) * floatAmplitude;
+                
+                // Appliquer le mouvement à la position
+                vec3 finalPosition = position + floatOffset;
+                vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;
                 gl_PointSize = pointSize * scaleFactor;
@@ -552,24 +672,51 @@ function createParticles() {
     borderGeometry.setAttribute('initialPosition', new THREE.BufferAttribute(borderInitialPositions, 3));
     borderGeometry.setAttribute('finalPosition', new THREE.BufferAttribute(borderFinalPositions, 3));
 
+    // Ajouter les mêmes attributs pour les particules de bordure
+    const borderParticleOffsets = new Float32Array(config.borderParticleCount * 3);
+    const borderParticlePhases = new Float32Array(config.borderParticleCount);
+    for (let i = 0; i < config.borderParticleCount; i++) {
+        borderParticlePhases[i] = Math.random() * Math.PI * 2;
+        borderParticleOffsets[i * 3] = (Math.random() - 0.5) * 0.02;
+        borderParticleOffsets[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
+        borderParticleOffsets[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+    }
+    borderGeometry.setAttribute('offset', new THREE.BufferAttribute(borderParticleOffsets, 3));
+    borderGeometry.setAttribute('phase', new THREE.BufferAttribute(borderParticlePhases, 1));
+
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
             pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.borderParticleSize },
             scaleFactor: { value: 1.0 },
             clipPlaneHeight: { value: config.clipPlaneHeight },
-            clipPlanePosition: { value: config.clipPlanePosition }
+            clipPlanePosition: { value: config.clipPlanePosition },
+            time: { value: 0.0 }
         },
         vertexShader: `
             uniform float pointSize;
             uniform float scaleFactor;
             uniform float clipPlaneHeight;
             uniform float clipPlanePosition;
+            uniform float time;
+            
+            attribute vec3 offset;
+            attribute float phase;
             
             varying vec4 vClipPos;
             
             void main() {
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                // Calculer le mouvement de flottement
+                float floatAmplitude = 0.015;
+                vec3 floatOffset = vec3(
+                    sin(time * 0.5 + phase) * offset.x,
+                    cos(time * 0.4 + phase) * offset.y,
+                    sin(time * 0.6 + phase) * offset.z
+                ) * floatAmplitude;
+                
+                // Appliquer le mouvement à la position
+                vec3 finalPosition = position + floatOffset;
+                vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;
                 gl_PointSize = pointSize * scaleFactor;

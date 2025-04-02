@@ -181,17 +181,18 @@ function init() {
     const planeMaterial = new THREE.MeshBasicMaterial({
         color: 0x00FEA5,
         transparent: true,
-        opacity: 1,
+        opacity: 0.8,
         side: THREE.DoubleSide,
         depthTest: false,
-        depthWrite: false
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
     });
     
     planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
     planeMesh.renderOrder = 999;
     planeMesh.position.set(
         config.greenLine.posX,
-        config.greenLine.posY,
+        (config.clipPlanePosition - config.clipPlaneHeight) * 2, // Position initiale convertie
         config.greenLine.posZ
     );
     planeMesh.frustumCulled = false;
@@ -943,6 +944,24 @@ function updateScroll() {
         if (borderParticles) {
             borderParticles.rotation.copy(particles.rotation);
         }
+    }
+
+    if (planeMesh) {
+        // Calcul de la position du plan dans l'espace NDC (-1 à 1)
+        const planeBottom = config.clipPlanePosition - config.clipPlaneHeight;
+        
+        // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
+        // Multiplier par 2 car la hauteur totale est de 2 unités dans l'espace NDC
+        const worldY = planeBottom * 2;
+        planeMesh.position.y = worldY;
+        
+        // Ajuste l'échelle du plan en fonction du zoom de la caméra
+        const scaleCompensation = config.initialZoom / camera.zoom;
+        planeMesh.scale.set(
+            (container.clientWidth / 1920) * 2 * scaleCompensation,
+            1,
+            1
+        );
     }
 }
 

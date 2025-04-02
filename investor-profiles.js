@@ -176,7 +176,7 @@ function init() {
 
     // Création du plan vert
     const viewWidth = camera.right - camera.left;
-    const planeWidth = (viewWidth * config.greenLine.width) / 100; // Utilise le pourcentage de la config
+    const planeWidth = (viewWidth * config.greenLine.width) / 100;
     const planeGeometry = new THREE.PlaneGeometry(planeWidth, config.greenLine.height);
     const planeMaterial = new THREE.MeshBasicMaterial({
         color: 0x00FEA5,
@@ -184,11 +184,11 @@ function init() {
         opacity: 1,
         side: THREE.DoubleSide,
         depthTest: false,
-        depthWrite: false,
-        renderOrder: 999
+        depthWrite: false
     });
     
     planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    planeMesh.renderOrder = 999;
     planeMesh.position.set(
         config.greenLine.posX,
         config.greenLine.posY,
@@ -691,17 +691,27 @@ function updateScroll() {
     const airdropSection = document.querySelector('.airdrop');
     const airdropRect = airdropSection.getBoundingClientRect();
     const currentScrolled = window.scrollY;
+    const windowHeight = window.innerHeight;
+    
+    // Calcul du point où la section atteint 50% du viewport
+    const halfViewport = windowHeight / 2;
+    const sectionTop = airdropRect.top;
     
     // Si la section n'est pas encore visible ou est déjà passée, on ne fait rien
-    if (airdropRect.bottom <= 0 || airdropRect.top >= window.innerHeight) {
+    if (sectionTop > halfViewport || airdropRect.bottom <= 0) {
         lastScrollY = currentScrolled;
         return;
     }
 
-    // Calcul du scroll progress uniquement pour la section .airdrop
-    const sectionHeight = airdropRect.height - window.innerHeight;
-    const scrolledInSection = Math.max(0, -airdropRect.top);
-    const scrollProgress = Math.min(100, Math.max(0, (scrolledInSection / sectionHeight) * 100));
+    // Calcul de la progression
+    const totalHeight = airdropRect.height - windowHeight; // Distance totale de scroll originale
+    const currentScroll = -airdropRect.top; // Position actuelle du scroll
+    const scrollAtStart = -halfViewport; // Position du scroll quand la section est à 50% du viewport
+    
+    // Calcul de la progression ajustée
+    const adjustedScroll = currentScroll - scrollAtStart; // Distance scrollée depuis le nouveau point de départ
+    const adjustedTotal = totalHeight - scrollAtStart; // Distance totale ajustée
+    const scrollProgress = Math.min(100, Math.max(0, (adjustedScroll / adjustedTotal) * 100));
     
     const animationProgress = Math.min(90, scrollProgress);
     const scrollingUp = currentScrolled < lastScrollY;

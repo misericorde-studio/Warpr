@@ -17,7 +17,7 @@ const config = {
     particleGlowRadius: 0.25,
     particleGlowColor: 0x4FFFC1,
     cameraDistance: -3,
-    initialZoom: 1.6,
+    initialZoom: 2.10,
     finalZoom: 0.8,
     cameraNear: 1,
     cameraFar: 2.2,
@@ -35,9 +35,6 @@ const config = {
     thicknessVariationMultiplier: 5.0,
     // Configuration du rectangle vert
     greenLine: {
-        posX: 0,
-        posY: 0,
-        posZ: -1.50,
         width: 32, // Pourcentage de la largeur du viewport
         height: 0.02
     }
@@ -190,11 +187,7 @@ function init() {
     
     planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
     planeMesh.renderOrder = 999;
-    planeMesh.position.set(
-        config.greenLine.posX,
-        (config.clipPlanePosition - config.clipPlaneHeight) * 2, // Position initiale convertie
-        config.greenLine.posZ
-    );
+    planeMesh.position.set(0, (config.clipPlanePosition - config.clipPlaneHeight) * 2, -1.5);
     planeMesh.frustumCulled = false;
     scene.add(planeMesh);
 }
@@ -1177,6 +1170,10 @@ function setupControls() {
     const clipPlanePositionValue = document.getElementById('clip-plane-position-value');
     const greenLineWidthControl = document.getElementById('green-line-width');
     const greenLineWidthValue = document.getElementById('green-line-width-value');
+    const initialZoomControl = document.getElementById('initial-zoom');
+    const initialZoomValue = document.getElementById('initial-zoom-value');
+    const finalZoomControl = document.getElementById('final-zoom');
+    const finalZoomValue = document.getElementById('final-zoom-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -1288,6 +1285,54 @@ function setupControls() {
         clipPlanePositionValue.textContent = value.toFixed(2);
         updateClipPlane();
     });
+
+    // Gestionnaires d'événements pour les contrôles de zoom
+    if (initialZoomControl) {
+        initialZoomControl.value = config.initialZoom;
+        initialZoomValue.textContent = config.initialZoom.toFixed(2);
+        
+        initialZoomControl.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            config.initialZoom = value;
+            initialZoomValue.textContent = value.toFixed(2);
+            
+            // Mettre à jour immédiatement le zoom si on est dans la phase initiale
+            const airdropSection = document.querySelector('.airdrop');
+            const airdropRect = airdropSection.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            const startPoint = windowHeight * 0.6;
+            const sectionTop = airdropRect.top;
+            
+            if (sectionTop > startPoint || -airdropRect.top < windowHeight * 0.4) {
+                camera.zoom = value;
+                camera.updateProjectionMatrix();
+            }
+        });
+    }
+
+    if (finalZoomControl) {
+        finalZoomControl.value = config.finalZoom;
+        finalZoomValue.textContent = config.finalZoom.toFixed(2);
+        
+        finalZoomControl.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            config.finalZoom = value;
+            finalZoomValue.textContent = value.toFixed(2);
+            
+            // Mettre à jour immédiatement le zoom si on est dans la phase finale
+            const airdropSection = document.querySelector('.airdrop');
+            const airdropRect = airdropSection.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            const totalHeight = airdropRect.height - windowHeight;
+            const currentScroll = -airdropRect.top;
+            const scrollProgress = Math.min(100, Math.max(0, (currentScroll / totalHeight) * 100));
+            
+            if (scrollProgress > 80) {
+                camera.zoom = value;
+                camera.updateProjectionMatrix();
+            }
+        });
+    }
 
     if (greenLineWidthControl) {
         greenLineWidthControl.addEventListener('input', (e) => {

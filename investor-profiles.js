@@ -177,6 +177,7 @@ function createParticles() {
     const colors = new Float32Array(config.particleCount * 3);
     const mainInitialPositions = new Float32Array(config.particleCount * 3);
     const mainFinalPositions = new Float32Array(config.particleCount * 3);
+    const radialOffsets = new Float32Array(config.particleCount); // Nouvel attribut pour les offsets radiaux
 
     // Valeurs fixes pour la continuité
     const startValues = new Float32Array(config.curvePhases);
@@ -242,6 +243,9 @@ function createParticles() {
 
         maxY = Math.max(maxY, y);
         minY = Math.min(minY, y);
+
+        // Générer et stocker un offset radial fixe pour chaque particule
+        radialOffsets[i] = Math.random() * 2 - 1;
     }
 
     // Deuxième passage pour définir les positions et les couleurs
@@ -326,6 +330,7 @@ function createParticles() {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('initialPosition', new THREE.BufferAttribute(mainInitialPositions, 3));
     geometry.setAttribute('finalPosition', new THREE.BufferAttribute(mainFinalPositions, 3));
+    geometry.setAttribute('radialOffset', new THREE.BufferAttribute(radialOffsets, 1));
 
     const material = new THREE.ShaderMaterial({
         uniforms: {
@@ -671,12 +676,39 @@ function updateScroll() {
             const mainInitialPos = particles.geometry.attributes.initialPosition.array;
             const mainFinalPos = particles.geometry.attributes.finalPosition.array;
             
-            // Pour les particules de bordure, on traite toutes les particules à chaque frame
-            // pour éviter les saccades, mais on réduit quand même la fréquence globale
-            if (scrollProgress % 2 === 0) {
-                // Mettre à jour toutes les particules principales par lots
-                const particlesPerBatch = Math.ceil(mainPositions.length / 9); // Diviser en 3 lots
-                const batchIndex = Math.floor(scrollProgress % 3); // Déterminer le lot actuel (0, 1, ou 2)
+            // Entre 60% et 90%, on met à jour toutes les particules à chaque frame
+            if (animationProgress >= 60 && animationProgress <= 90) {
+                // Calculer l'épaisseur radiale maximale (augmente de 0 à 0.1)
+                const maxThickness = ((animationProgress - 60) / 30) * 0.1;
+                const radialOffsets = particles.geometry.attributes.radialOffset.array;
+                
+                // Mettre à jour toutes les particules principales
+                for (let i = 0; i < mainPositions.length; i += 3) {
+                    const particleIndex = i / 3;
+                    // Position de base avec déploiement progressif
+                    const baseX = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
+                    const baseZ = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
+
+                    // Calculer la direction radiale normalisée
+                    const dx = baseX;
+                    const dz = baseZ;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    const dirX = dx / dist;
+                    const dirZ = dz / dist;
+                    
+                    // Utiliser l'offset radial pré-calculé
+                    const radialOffset = radialOffsets[particleIndex] * maxThickness;
+                    
+                    // Appliquer l'offset dans la direction radiale
+                    mainPositions[i] = baseX + dirX * radialOffset;
+                    mainPositions[i + 1] = mainInitialPos[i + 1];
+                    mainPositions[i + 2] = baseZ + dirZ * radialOffset;
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+            } else if (scrollProgress % 2 === 0) {
+                // En dehors de la plage 60-90%, on continue avec la mise à jour par lots
+                const particlesPerBatch = Math.ceil(mainPositions.length / 9);
+                const batchIndex = Math.floor(scrollProgress % 3);
                 const startIdx = batchIndex * particlesPerBatch * 3;
                 const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
                 

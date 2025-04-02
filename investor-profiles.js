@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     radius: 1.5,
     particleCount: 2600,
-    particleSize: 8.40,
+    particleSize: 9.60,
     curveAmplitude: 0.4,
     curveFrequency: 9,
     curvePhases: 4,
@@ -23,14 +23,15 @@ const config = {
     cameraFar: 2.2,
     initialFar: 2.2,
     finalFar: 4.5,
-    greenThreshold: 0.01,  // Retour à la valeur initiale originale
+    greenThreshold: 0.01,
     // Configuration de la bordure
-    borderWidth: 0.4,        // Largeur de la bordure
-    borderParticleCount: 2000, // Nombre de particules dans la bordure
-    borderParticleMaxSize: 4.20,  // Modifié de 12.0 à 4.20
-    borderParticleMinSize: 4.20,  // Modifié de 4.0 à 4.20 pour une taille uniforme
-    borderColor: 0xFFFFFF,    // Couleur de la bordure
-    thicknessVariationMultiplier: 5.0, // Augmenté de 3.0 à 5.0 pour plus de variation d'épaisseur
+    borderWidth: 0.4,
+    borderParticleCount: 2000,
+    borderParticleSize: 4.70,
+    borderParticleMaxSize: 4.70,
+    borderParticleMinSize: 4.70,
+    borderColor: 0xFFFFFF,
+    thicknessVariationMultiplier: 5.0,
 };
 
 // Variables globales
@@ -123,9 +124,12 @@ function init() {
     // Création des particules
     createParticles();
     
-    // Centrer les particules dans la scène
-    if (particles) {
-        particles.position.set(0, 0, 0);
+    // Mettre à jour l'échelle initiale des particules
+    if (particles && particles.material.uniforms) {
+        particles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+    }
+    if (borderParticles && borderParticles.material.uniforms) {
+        borderParticles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
     }
 
     // Mise en cache des éléments DOM
@@ -336,17 +340,19 @@ function createParticles() {
     const material = new THREE.ShaderMaterial({
         uniforms: {
             pointTexture: { value: createParticleTexture() },
-            pointSize: { value: config.particleSize }
+            pointSize: { value: config.particleSize },
+            scaleFactor: { value: 1.0 }
         },
         vertexShader: `
-            varying float vY;
             uniform float pointSize;
+            uniform float scaleFactor;
+            varying float vY;
             
             void main() {
                 vY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
-                gl_PointSize = pointSize;
+                gl_PointSize = pointSize * scaleFactor;
             }
         `,
         fragmentShader: `
@@ -360,7 +366,7 @@ function createParticles() {
                 
                 vec3 color = vec3(1.0);
                 if (vY > ${config.greenThreshold}) {
-                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+                    color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
                 gl_FragColor = vec4(color, alpha);
@@ -455,17 +461,20 @@ function createParticles() {
 
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            pointTexture: { value: createParticleTexture() }
+            pointTexture: { value: createParticleTexture() },
+            pointSize: { value: config.borderParticleSize },
+            scaleFactor: { value: 1.0 }
         },
         vertexShader: `
-            attribute float size;
+            uniform float pointSize;
+            uniform float scaleFactor;
             varying float vY;
             
             void main() {
                 vY = position.y;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
-                gl_PointSize = size;
+                gl_PointSize = pointSize * scaleFactor;
             }
         `,
         fragmentShader: `
@@ -479,7 +488,7 @@ function createParticles() {
                 
                 vec3 color = vec3(1.0);
                 if (vY > ${config.greenThreshold}) {
-                    color = vec3(0.0, 254.0/255.0, 165.0/255.0); // #00FEA5
+                    color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
                 gl_FragColor = vec4(color, alpha);
@@ -489,6 +498,7 @@ function createParticles() {
         `,
         transparent: true,
         depthWrite: false,
+        depthTest: false,
         blending: THREE.NormalBlending
     });
 
@@ -531,6 +541,16 @@ function onWindowResize() {
     camera.top = frustumSize / 2;
     camera.bottom = frustumSize / -2;
     camera.updateProjectionMatrix();
+    
+    // Mettre à jour l'échelle des particules
+    if (particles && particles.material.uniforms) {
+        particles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+        particles.material.uniforms.pointSize.value = config.particleSize;
+    }
+    if (borderParticles && borderParticles.material.uniforms) {
+        borderParticles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+        borderParticles.material.uniforms.pointSize.value = config.borderParticleSize;
+    }
     
     renderer.setSize(container.clientWidth, container.clientHeight);
 }
@@ -878,37 +898,22 @@ function setupControls() {
     });
 
     mainParticleSizeControl.addEventListener('input', (e) => {
-        config.particleSize = parseFloat(e.target.value);
-        mainParticleSizeValue.textContent = config.particleSize.toFixed(2);
+        const size = parseFloat(e.target.value);
+        config.particleSize = size;
+        mainParticleSizeValue.textContent = size.toFixed(2);
         if (particles && particles.material.uniforms) {
-            particles.material.uniforms.pointSize.value = config.particleSize;
+            particles.material.uniforms.pointSize.value = size;
         }
     });
 
     borderParticleSizeControl.addEventListener('input', (e) => {
         const size = parseFloat(e.target.value);
+        config.borderParticleSize = size;
+        config.borderParticleMaxSize = size;
+        config.borderParticleMinSize = size;
         borderParticleSizeValue.textContent = size.toFixed(2);
-        if (borderParticles) {
-            config.borderParticleMaxSize = size * 1.2;
-            config.borderParticleMinSize = size * 0.8;
-            const positions = borderParticles.geometry.attributes.position.array;
-            const sizes = borderParticles.geometry.attributes.size.array;
-            
-            for (let i = 0; i < config.borderParticleCount; i++) {
-                const i3 = i * 3;
-                const baseX = positions[i3];
-                const baseY = positions[i3 + 1];
-                const baseZ = positions[i3 + 2];
-                
-                const distanceFromBase = Math.sqrt(
-                    Math.pow(baseX - Math.cos(Math.atan2(baseZ, baseX)) * config.radius, 2) +
-                    Math.pow(baseZ - Math.sin(Math.atan2(baseZ, baseX)) * config.radius, 2)
-                );
-                const normalizedDistance = Math.min(distanceFromBase / config.borderWidth, 1);
-                sizes[i] = config.borderParticleMaxSize * (1 - normalizedDistance) + config.borderParticleMinSize * normalizedDistance;
-            }
-            
-            borderParticles.geometry.attributes.size.needsUpdate = true;
+        if (borderParticles && borderParticles.material.uniforms) {
+            borderParticles.material.uniforms.pointSize.value = size;
         }
     });
 

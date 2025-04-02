@@ -208,14 +208,38 @@ function animate(timestamp) {
         window.lenis.raf(timestamp);
     }
     
-    // Mise à jour de la barre de progression
+    // Mise à jour de la barre de progression avec le pourcentage de la section airdrop
     if (progressBar && progressValue) {
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrolled = window.scrollY;
-        const progress = Math.min(100, Math.round((scrolled / scrollHeight) * 100));
+        const airdropSection = document.querySelector('.airdrop');
+        const airdropRect = airdropSection.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
         
-        progressBar.style.setProperty('--progress', `${progress}%`);
-        progressValue.textContent = `[ ${progress}% ]`;
+        // Calcul du point où la section atteint 60% du viewport
+        const startPoint = windowHeight * 0.6;
+        const sectionTop = airdropRect.top;
+        
+        // Si la section n'est pas encore visible, progression à 0
+        if (sectionTop > startPoint) {
+            progressBar.style.setProperty('--progress', '0%');
+            progressValue.textContent = '[ 0% ]';
+        }
+        // Si la section est déjà passée, progression à 100%
+        else if (airdropRect.bottom <= 0) {
+            progressBar.style.setProperty('--progress', '100%');
+            progressValue.textContent = '[ 100% ]';
+        }
+        // Sinon, calculer la progression comme dans updateScroll
+        else {
+            const totalHeight = airdropRect.height - windowHeight;
+            const currentScroll = -airdropRect.top;
+            const scrollAtStart = -startPoint;
+            const adjustedScroll = currentScroll - scrollAtStart;
+            const adjustedTotal = totalHeight - scrollAtStart;
+            const progress = Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
+            
+            progressBar.style.setProperty('--progress', `${progress}%`);
+            progressValue.textContent = `[ ${progress}% ]`;
+        }
     }
     
     // Limite le framerate à ~60fps
@@ -951,14 +975,25 @@ function updateScroll() {
         const planeBottom = config.clipPlanePosition - config.clipPlaneHeight;
         
         // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
-        // Multiplier par 2 car la hauteur totale est de 2 unités dans l'espace NDC
         const worldY = planeBottom * 2;
         planeMesh.position.y = worldY;
         
         // Ajuste l'échelle du plan en fonction du zoom de la caméra
         const scaleCompensation = config.initialZoom / camera.zoom;
+        
+        // Calcul de la largeur en fonction de la progression
+        let widthScale = 1;
+        
+        // Réduction de la largeur entre 48% et 50%
+        if (scrollProgress >= 48.0 && scrollProgress <= 50.0) {
+            const fadeProgress = (scrollProgress - 48.0) / 2.0;
+            widthScale = Math.max(0, 1 - fadeProgress);
+        } else if (scrollProgress > 50.0) {
+            widthScale = 0;
+        }
+        
         planeMesh.scale.set(
-            (container.clientWidth / 1920) * 2 * scaleCompensation,
+            (container.clientWidth / 1920) * 2 * scaleCompensation * widthScale,
             1,
             1
         );
@@ -993,6 +1028,8 @@ function setupControls() {
     const clipPlaneHeightValue = document.getElementById('clip-plane-height-value');
     const clipPlanePositionControl = document.getElementById('clip-plane-position');
     const clipPlanePositionValue = document.getElementById('clip-plane-position-value');
+    const greenLineWidthControl = document.getElementById('green-line-width');
+    const greenLineWidthValue = document.getElementById('green-line-width-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -1049,102 +1086,61 @@ function setupControls() {
     });
 
     particleCountControl.addEventListener('input', (e) => {
-        config.particleCount = parseInt(e.target.value);
-        particleCountValue.textContent = config.particleCount;
-        // Recréer les particules avec le nouveau compte
-        if (particles) {
-            scene.remove(particles);
-        }
-        if (borderParticles) {
-            scene.remove(borderParticles);
-        }
-        createParticles();
+        const value = parseInt(e.target.value);
+        config.particleCount = value;
+        particleCountValue.textContent = value;
+        updateParticles();
     });
 
     curveAmplitudeControl.addEventListener('input', (e) => {
-        heightVariation = parseFloat(e.target.value);
-        curveAmplitudeValue.textContent = heightVariation.toFixed(2);
+        const value = parseFloat(e.target.value);
+        config.curveAmplitude = value;
+        curveAmplitudeValue.textContent = value.toFixed(2);
         updateParticles();
     });
 
     maxThicknessControl.addEventListener('input', (e) => {
-        lineThickness = parseFloat(e.target.value);
-        maxThicknessValue.textContent = lineThickness.toFixed(3);
+        const value = parseFloat(e.target.value);
+        config.thicknessVariationMultiplier = value;
+        maxThicknessValue.textContent = value.toFixed(2);
         updateParticles();
     });
 
     minThicknessControl.addEventListener('input', (e) => {
-        const minThickness = parseFloat(e.target.value);
-        minThicknessValue.textContent = minThickness.toFixed(3);
-        config.borderParticleMinSize = minThickness * 100;
+        const value = parseFloat(e.target.value);
+        lineThickness = value;
+        minThicknessValue.textContent = value.toFixed(2);
         updateParticles();
     });
 
     greenThresholdControl.addEventListener('input', (e) => {
-        config.greenThreshold = parseFloat(e.target.value);
-        greenThresholdValue.textContent = config.greenThreshold.toFixed(2);
-        updateClipPlane();
+        const value = parseFloat(e.target.value);
+        config.greenThreshold = value;
+        greenThresholdValue.textContent = value.toFixed(2);
+        updateParticles();
     });
 
     cameraFarControl.addEventListener('input', (e) => {
-        const farValue = parseFloat(e.target.value);
-        config.initialFar = farValue;
-        config.finalFar = farValue * 1.5; // Maintient le ratio entre initialFar et finalFar
-        cameraFarValue.textContent = farValue.toFixed(1);
-        
-        // Met à jour la caméra immédiatement
-        camera.far = farValue;
-        camera.near = Math.max(0.1, farValue * 0.1); // Ajuste aussi le near pour éviter les problèmes de rendu
-        camera.updateProjectionMatrix();
+        const value = parseFloat(e.target.value);
+        config.finalFar = value;
+        config.initialFar = value;
+        cameraFarValue.textContent = value.toFixed(2);
+        updateParticles();
     });
 
     clipPlaneHeightControl.addEventListener('input', (e) => {
-        config.clipPlaneHeight = parseFloat(e.target.value);
-        clipPlaneHeightValue.textContent = config.clipPlaneHeight.toFixed(2);
+        const value = parseFloat(e.target.value);
+        config.clipPlaneHeight = value;
+        clipPlaneHeightValue.textContent = value.toFixed(2);
         updateClipPlane();
     });
 
     clipPlanePositionControl.addEventListener('input', (e) => {
-        config.clipPlanePosition = parseFloat(e.target.value);
-        clipPlanePositionValue.textContent = config.clipPlanePosition.toFixed(2);
+        const value = parseFloat(e.target.value);
+        config.clipPlanePosition = value;
+        clipPlanePositionValue.textContent = value.toFixed(2);
         updateClipPlane();
     });
-
-    // Contrôles pour le rectangle vert
-    const greenLinePosXControl = document.getElementById('green-line-pos-x');
-    const greenLinePosYControl = document.getElementById('green-line-pos-y');
-    const greenLinePosZControl = document.getElementById('green-line-pos-z');
-    const greenLinePosXValue = document.getElementById('green-line-pos-x-value');
-    const greenLinePosYValue = document.getElementById('green-line-pos-y-value');
-    const greenLinePosZValue = document.getElementById('green-line-pos-z-value');
-
-    if (greenLinePosXControl) {
-        greenLinePosXControl.addEventListener('input', (e) => {
-            config.greenLine.posX = parseFloat(e.target.value);
-            greenLinePosXValue.textContent = config.greenLine.posX.toFixed(2);
-            if (planeMesh) planeMesh.position.x = config.greenLine.posX;
-        });
-    }
-
-    if (greenLinePosYControl) {
-        greenLinePosYControl.addEventListener('input', (e) => {
-            config.greenLine.posY = parseFloat(e.target.value);
-            greenLinePosYValue.textContent = config.greenLine.posY.toFixed(2);
-            if (planeMesh) planeMesh.position.y = config.greenLine.posY;
-        });
-    }
-
-    if (greenLinePosZControl) {
-        greenLinePosZControl.addEventListener('input', (e) => {
-            config.greenLine.posZ = parseFloat(e.target.value);
-            greenLinePosZValue.textContent = config.greenLine.posZ.toFixed(2);
-            if (planeMesh) planeMesh.position.z = config.greenLine.posZ;
-        });
-    }
-
-    // Contrôle de la largeur du rectangle vert
-    const greenLineWidthControl = document.getElementById('green-line-width');
-    const greenLineWidthValue = document.getElementById('green-line-width-value');
 
     if (greenLineWidthControl) {
         greenLineWidthControl.addEventListener('input', (e) => {

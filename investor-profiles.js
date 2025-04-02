@@ -615,13 +615,24 @@ function updateColors() {
 
 // Optimisation de la fonction updateScroll
 function updateScroll() {
-    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const scrolled = window.scrollY;
-    const scrollProgress = Math.min(100, Math.max(0, (scrolled / scrollHeight) * 100));
-    const animationProgress = Math.min(90, scrollProgress);
+    const airdropSection = document.querySelector('.airdrop');
+    const airdropRect = airdropSection.getBoundingClientRect();
+    const currentScrolled = window.scrollY;
     
-    const scrollingUp = scrolled < lastScrollY;
-    lastScrollY = scrolled;
+    // Si la section n'est pas encore visible ou est déjà passée, on ne fait rien
+    if (airdropRect.bottom <= 0 || airdropRect.top >= window.innerHeight) {
+        lastScrollY = currentScrolled;
+        return;
+    }
+
+    // Calcul du scroll progress uniquement pour la section .airdrop
+    const sectionHeight = airdropRect.height - window.innerHeight;
+    const scrolledInSection = Math.max(0, -airdropRect.top);
+    const scrollProgress = Math.min(100, Math.max(0, (scrolledInSection / sectionHeight) * 100));
+    
+    const animationProgress = Math.min(90, scrollProgress);
+    const scrollingUp = currentScrolled < lastScrollY;
+    lastScrollY = currentScrolled;
 
     // Animation du seuil en fonction du scroll
     let newThreshold;
@@ -666,16 +677,6 @@ function updateScroll() {
     // Mise à jour du seuil de couleur uniquement si la valeur a changé
     if (Math.abs(config.greenThreshold - newThreshold) > 0.001) {
         config.greenThreshold = newThreshold;
-
-        // Mise à jour de la valeur dans le contrôle (moins fréquente)
-        if (scrollProgress % 5 < 1) { // 1 mise à jour sur 5 pour les contrôles UI
-            const greenThresholdControl = document.getElementById('green-threshold');
-            const greenThresholdValue = document.getElementById('green-threshold-value');
-            if (greenThresholdControl && greenThresholdValue) {
-                greenThresholdControl.value = newThreshold;
-                greenThresholdValue.textContent = newThreshold.toFixed(2);
-            }
-        }
         updateColors();
     }
 

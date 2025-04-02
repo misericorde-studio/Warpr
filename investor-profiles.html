@@ -338,9 +338,29 @@
             background: rgba(0, 254, 165, 0.3);
             border-color: rgba(0, 254, 165, 0.5);
         }
+
+        .scroll-section {
+            width: 100vw;
+            height: 100vh;
+            background-color: #1A1A1A;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .scroll-section p {
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+        }
     </style>
 </head>
 <body>
+    <section class="scroll-section">
+        <p>scroll</p>
+    </section>
+
     <div class="airdrop">
         <div class="airdrop_left">
             <div class="threshold-line-container">
@@ -421,6 +441,10 @@
             </div>
         </div>
     </div>
+
+    <section class="scroll-section">
+        <p>scroll end</p>
+    </section>
 
     <div id="controls-panel" style="display: none;">
         <div class="control-group">

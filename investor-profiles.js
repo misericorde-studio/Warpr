@@ -90,7 +90,8 @@ function init() {
 
     // Caméra orthographique
     const aspect = container.clientWidth / container.clientHeight;
-    const frustumSize = 5;
+    const baseWidth = 1920; // Largeur de référence
+    const frustumSize = (baseWidth / container.clientWidth) * 3.5;
     camera = new THREE.OrthographicCamera(
         frustumSize * aspect / -2,
         frustumSize * aspect / 2,
@@ -522,7 +523,8 @@ function onWindowResize() {
     if (!container) return;
     
     const aspect = container.clientWidth / container.clientHeight;
-    const frustumSize = 5;
+    const baseWidth = 1920; // Largeur de référence
+    const frustumSize = (baseWidth / container.clientWidth) * 3.5;
     
     camera.left = frustumSize * aspect / -2;
     camera.right = frustumSize * aspect / 2;

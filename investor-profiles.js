@@ -693,12 +693,12 @@ function updateScroll() {
     const currentScrolled = window.scrollY;
     const windowHeight = window.innerHeight;
     
-    // Calcul du point où la section atteint 50% du viewport
-    const halfViewport = windowHeight / 2;
+    // Calcul du point où la section atteint 60% du viewport
+    const startPoint = windowHeight * 0.6;
     const sectionTop = airdropRect.top;
     
     // Si la section n'est pas encore visible ou est déjà passée, on ne fait rien
-    if (sectionTop > halfViewport || airdropRect.bottom <= 0) {
+    if (sectionTop > startPoint || airdropRect.bottom <= 0) {
         lastScrollY = currentScrolled;
         return;
     }
@@ -706,7 +706,7 @@ function updateScroll() {
     // Calcul de la progression
     const totalHeight = airdropRect.height - windowHeight; // Distance totale de scroll originale
     const currentScroll = -airdropRect.top; // Position actuelle du scroll
-    const scrollAtStart = -halfViewport; // Position du scroll quand la section est à 50% du viewport
+    const scrollAtStart = -startPoint; // Position du scroll quand la section est à 60% du viewport
     
     // Calcul de la progression ajustée
     const adjustedScroll = currentScroll - scrollAtStart; // Distance scrollée depuis le nouveau point de départ

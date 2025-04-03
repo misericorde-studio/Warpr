@@ -4,9 +4,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Configuration
 const config = {
     radius: 1.5,
-    particleCount: 2600,
-    particleSize: 12.60,
-    curveAmplitude: 0.4,
+    particleCount: 1000,
+    particleSize: 10.0,
+    curveAmplitude: 0.22,
     curveFrequency: 9,
     curvePhases: 4,
     noiseScale: 0.8,
@@ -18,13 +18,13 @@ const config = {
     particleGlowColor: 0x4FFFC1,
     cameraDistance: -3,
     initialZoom: 2.10,
-    finalZoom: 1.10,
+    finalZoom: 0.8,  // Modifié de 1.50 à 1.10
     cameraNear: 1,
     cameraFar: 2.2,
     initialFar: 2.2,
-    finalFar: 4.5,
-    clipPlaneHeight: 0.5, // 50% de la hauteur initiale
-    clipPlanePosition: 0.5, // Position initiale en haut (NDC y va de -1 à 1)
+    finalFar: 3.5,
+    clipPlaneHeight: 0.5,
+    clipPlanePosition: 0.0,
     // Configuration de la bordure
     borderWidth: 0.4,
     borderParticleCount: 2000,
@@ -35,7 +35,7 @@ const config = {
     thicknessVariationMultiplier: 5.0,
     // Configuration du rectangle vert
     greenLine: {
-        width: 0.58, // Largeur de la ligne verte
+        width: 0.58,
         height: 0.02
     }
 };
@@ -58,6 +58,11 @@ let targetRotationY = 0;
 let currentRotationY = 0;
 let targetRotationX = 0;
 let currentRotationX = 0;
+let visibilityObserver, prewarmObserver;
+let currentZoom = 2.10;
+let targetZoom = 2.10;
+let currentFar = 2.2;
+let targetFar = 2.2;
 
 // Tableaux de positions
 let mainInitialPositions;
@@ -90,6 +95,35 @@ const particleCache = {
     borderDeploymentProgress: null,
     borderRadialProgress: null
 };
+
+// Cache pour les calculs fréquents
+const mathCache = {
+    sin: new Float32Array(360),
+    cos: new Float32Array(360),
+    phases: new Float32Array(config.particleCount + config.borderParticleCount),
+    borderPhases: new Float32Array(config.particleCount + config.borderParticleCount)
+};
+
+// Pré-calcul des sinus et cosinus
+for (let i = 0; i < 360; i++) {
+    mathCache.sin[i] = Math.sin(i * Math.PI / 180);
+    mathCache.cos[i] = Math.cos(i * Math.PI / 180);
+}
+
+// Pré-calcul des phases aléatoires
+for (let i = 0; i < config.particleCount + config.borderParticleCount; i++) {
+    mathCache.phases[i] = Math.random() * Math.PI * 2;
+    mathCache.borderPhases[i] = Math.random() * Math.PI * 2;
+}
+
+// Optimisation des buffers de géométrie
+function createOptimizedGeometry(particleCount) {
+    const positions = new Float32Array(particleCount * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.attributes.position.usage = THREE.DynamicDrawUsage;
+    return geometry;
+}
 
 // Fonction de bruit 1D simplifiée
 function noise1D(x) {
@@ -127,6 +161,9 @@ function init() {
         return;
     }
     
+    // Création de l'observer pour la visibilité
+    visibilityObserver = createObserver(container);
+    
     // Scène principale
     scene = new THREE.Scene();
     scene.background = new THREE.Color(config.backgroundColor);
@@ -151,29 +188,34 @@ function init() {
     camera.updateProjectionMatrix();
 
     // Renderer avec optimisations spécifiques pour Chrome
-    renderer = new THREE.WebGLRenderer({ 
+    renderer = new THREE.WebGLRenderer({
         antialias: true,
-        alpha: false, // Désactive l'alpha pour améliorer les performances
-        powerPreference: 'high-performance',
+        alpha: false,
         stencil: false,
-        depth: false,
+        depth: true,
+        powerPreference: 'high-performance',
+        precision: 'highp',
         premultipliedAlpha: false,
-        preserveDrawingBuffer: false
+        preserveDrawingBuffer: false,
+        logarithmicDepthBuffer: false
     });
     
     // Optimisations du renderer
     renderer.setSize(container.clientWidth, container.clientHeight, false);
     renderer.setPixelRatio(1); // Force un pixel ratio de 1 pour de meilleures performances
+    renderer.setClearColor(0x0B0E13, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     
     // Désactive les fonctionnalités non utilisées
     renderer.shadowMap.enabled = false;
     renderer.physicallyCorrectLights = false;
     
+    renderer.info.autoReset = false;
+    
     container.appendChild(renderer.domElement);
 
     // Initialiser l'IntersectionObserver pour le préchauffage
-    const observer = new IntersectionObserver((entries) => {
+    prewarmObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting && !hasPrewarmed) {
                 // Préchauffer le GPU avec quelques frames
@@ -182,11 +224,11 @@ function init() {
             }
         });
     }, {
-        rootMargin: '100px 0px', // Commence l'observation 100px avant que l'élément soit visible
+        rootMargin: '100px 0px',
         threshold: 0
     });
 
-    observer.observe(container);
+    prewarmObserver.observe(container);
 
     // Horloge
     clock = new THREE.Clock();
@@ -244,7 +286,7 @@ function init() {
         color: 0x00FEA5,
         linewidth: 2,
         transparent: true,
-        opacity: 0.8,
+        opacity: 1.0,
         depthTest: false,
         depthWrite: false,
         blending: THREE.AdditiveBlending
@@ -261,6 +303,17 @@ function init() {
 
     // Pré-allocation du cache de particules
     initializeParticleCache();
+
+    // Initialisation des valeurs de zoom
+    currentZoom = config.initialZoom;
+    targetZoom = config.initialZoom;
+    currentFar = config.initialFar;
+    targetFar = config.initialFar;
+    
+    camera.zoom = currentZoom;
+    camera.far = currentFar;
+    camera.near = Math.max(0.1, currentFar * 0.1);
+    camera.updateProjectionMatrix();
 }
 
 // Initialisation du cache de particules
@@ -306,7 +359,6 @@ function animate(timestamp) {
 
         // Utilisation de Lenis pour l'interpolation
         if (window.lenis) {
-            // Interpolation douce avec les paramètres de Lenis
             const rotationLerp = window.lenis.options.lerp;
             
             // Interpolation de la rotation Y
@@ -320,6 +372,49 @@ function animate(timestamp) {
             // Appliquer les rotations à la bordure
             if (borderParticles) {
                 borderParticles.rotation.copy(particles.rotation);
+            }
+        }
+
+        // Gestion du zoom et de la distance max
+        if (scrollProgress < 40) {
+            targetZoom = config.initialZoom;
+            targetFar = config.initialFar;
+        } else if (scrollProgress >= 40 && scrollProgress <= 80) {
+            const progress = (scrollProgress - 40) / 40;
+            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
+            targetFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
+        } else {
+            targetZoom = config.finalZoom;
+            targetFar = config.finalFar;
+        }
+
+        // Interpolation douce avec Lenis
+        if (window.lenis) {
+            const lerpFactor = window.lenis.options.lerp;
+            
+            // Interpolation du zoom
+            currentZoom += (targetZoom - currentZoom) * lerpFactor;
+            camera.zoom = currentZoom;
+            
+            // Interpolation de la distance far
+            currentFar += (targetFar - currentFar) * lerpFactor;
+            camera.far = currentFar;
+            camera.near = Math.max(0.1, currentFar * 0.1);
+            
+            camera.updateProjectionMatrix();
+
+            // Ajuster l'échelle du rectangle pour le zoom courant
+            if (planeMesh) {
+                const scaleCompensation = config.initialZoom / currentZoom;
+                const frustumSize = (camera.top - camera.bottom);
+                const aspect = container.clientWidth / container.clientHeight;
+                const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+                
+                planeMesh.scale.set(
+                    targetWidth * scaleCompensation,
+                    1,
+                    1
+                );
             }
         }
     }
@@ -766,7 +861,6 @@ function createParticles() {
 
     const material = new THREE.ShaderMaterial({
         uniforms: {
-            pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.particleSize },
             scaleFactor: { value: 1.0 },
             clipPlaneHeight: { value: config.clipPlaneHeight },
@@ -807,15 +901,23 @@ function createParticles() {
         fragmentShader: `
             uniform float clipPlaneHeight;
             uniform float clipPlanePosition;
-            uniform sampler2D pointTexture;
             
             varying vec4 vClipPos;
             varying float vY;
             
             void main() {
-                vec2 center = vec2(0.5, 0.5);
-                float dist = length(gl_PointCoord - center);
-                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                // Calculer la distance au centre du point
+                vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                float r = dot(cxy, cxy);
+                
+                // Antialiasing doux
+                float delta = fwidth(r);
+                float alpha = 1.0 - smoothstep(1.0 - delta, 1.0, r);
+                
+                // Si complètement transparent, discard
+                if (alpha <= 0.0) {
+                    discard;
+                }
                 
                 vec3 color = vec3(1.0);
                 float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
@@ -825,14 +927,11 @@ function createParticles() {
                 }
                 
                 gl_FragColor = vec4(color, alpha);
-                
-                if (alpha < 0.01) discard;
             }
         `,
         transparent: true,
         depthWrite: false,
-        depthTest: false,
-        blending: THREE.NormalBlending
+        depthTest: false
     });
 
     particles = new THREE.Points(geometry, material);
@@ -923,7 +1022,6 @@ function createParticles() {
 
     const borderMaterial = new THREE.ShaderMaterial({
         uniforms: {
-            pointTexture: { value: createParticleTexture() },
             pointSize: { value: config.borderParticleSize },
             scaleFactor: { value: 1.0 },
             clipPlaneHeight: { value: config.clipPlaneHeight },
@@ -964,15 +1062,23 @@ function createParticles() {
         fragmentShader: `
             uniform float clipPlaneHeight;
             uniform float clipPlanePosition;
-            uniform sampler2D pointTexture;
             
             varying vec4 vClipPos;
             varying float vY;
             
             void main() {
-                vec2 center = vec2(0.5, 0.5);
-                float dist = length(gl_PointCoord - center);
-                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                // Calculer la distance au centre du point
+                vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                float r = dot(cxy, cxy);
+                
+                // Antialiasing doux
+                float delta = fwidth(r);
+                float alpha = 1.0 - smoothstep(1.0 - delta, 1.0, r);
+                
+                // Si complètement transparent, discard
+                if (alpha <= 0.0) {
+                    discard;
+                }
                 
                 vec3 color = vec3(1.0);
                 float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
@@ -982,14 +1088,11 @@ function createParticles() {
                 }
                 
                 gl_FragColor = vec4(color, alpha);
-                
-                if (alpha < 0.01) discard;
             }
         `,
         transparent: true,
         depthWrite: false,
-        depthTest: false,
-        blending: THREE.NormalBlending
+        depthTest: false
     });
 
     borderParticles = new THREE.Points(borderGeometry, borderMaterial);
@@ -999,22 +1102,25 @@ function createParticles() {
 
 function createParticleTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = 128; // Augmentation de la résolution
+    canvas.height = 128;
     const ctx = canvas.getContext('2d');
 
     // Fond transparent
     ctx.fillStyle = 'rgba(0,0,0,0)';
-    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillRect(0, 0, 128, 128);
 
-    // Cercle net
+    // Cercle net sans antialiasing
     ctx.beginPath();
-    ctx.arc(32, 32, 28, 0, Math.PI * 2);
+    ctx.arc(64, 64, 63, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
+    // Désactiver le filtrage bilinéaire pour des bords plus nets
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
     return texture;
 }
 
@@ -1284,71 +1390,47 @@ function updateScroll() {
             }
         }
 
-        // Gestion du zoom et de la distance max
+        // Gestion du zoom et de la distance max avec Lenis
         if (animationProgress < 40) {  // En dessous de 40%
-            camera.zoom = config.initialZoom;
-            camera.far = config.initialFar;
-            camera.near = Math.max(0.1, config.initialFar * 0.1);
-            camera.updateProjectionMatrix();
-            
-            // Ajuster l'échelle du rectangle pour le zoom initial
-            if (planeMesh) {
-                planeMesh.scale.set(
-                    (container.clientWidth / 1920) * 2,
-                    1,
-                    1
-                );
-            }
+            targetZoom = config.initialZoom;
+            targetFar = config.initialFar;
         } else if (animationProgress >= 40 && animationProgress <= 80) {
             const progress = (animationProgress - 40) / 40;
-            
-            // Animation de la distance max
-            const newFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
-            camera.far = newFar;
-            camera.near = Math.max(0.1, newFar * 0.1);
-            
-            // Animation du zoom avec direction
-            let newZoom;
-            if (scrollingUp) {
-                newZoom = config.finalZoom + (config.initialZoom - config.finalZoom) * (1 - progress);
-            } else {
-                newZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
-            }
-            camera.zoom = newZoom;
-            camera.updateProjectionMatrix();
-            
-            // Ajuster l'échelle du rectangle pour compenser le zoom
-            if (planeMesh) {
-                const scaleCompensation = config.initialZoom / newZoom;
-                planeMesh.scale.set(
-                    (container.clientWidth / 1920) * 2 * scaleCompensation,
-                    1,
-                    1
-                );
-            }
+            targetFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
+            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
         } else {
-            camera.zoom = config.finalZoom;
-            camera.far = config.finalFar;
-            camera.near = Math.max(0.1, config.finalFar * 0.1);
-            camera.updateProjectionMatrix();
-            
-            // Ajuster l'échelle du rectangle pour le zoom final
-            if (planeMesh) {
-                const scaleCompensation = config.initialZoom / config.finalZoom;
-                planeMesh.scale.set(
-                    (container.clientWidth / 1920) * 2 * scaleCompensation,
-                    1,
-                    1
-                );
-            }
+            targetZoom = config.finalZoom;
+            targetFar = config.finalFar;
         }
 
-        // S'assurer que le point de pivot reste au centre
-        particles.position.set(0, 0, 0);
+        // Interpolation douce avec Lenis
+        if (window.lenis) {
+            const lerpFactor = window.lenis.options.lerp;
+            
+            // Interpolation du zoom
+            currentZoom += (targetZoom - currentZoom) * lerpFactor;
+            camera.zoom = currentZoom;
+            
+            // Interpolation de la distance far
+            currentFar += (targetFar - currentFar) * lerpFactor;
+            camera.far = currentFar;
+            camera.near = Math.max(0.1, currentFar * 0.1);
+            
+            camera.updateProjectionMatrix();
 
-        // Appliquer les mêmes rotations à la bordure
-        if (borderParticles) {
-            borderParticles.rotation.copy(particles.rotation);
+            // Ajuster l'échelle du rectangle pour le zoom courant
+            if (planeMesh) {
+                const scaleCompensation = config.initialZoom / currentZoom;
+                const frustumSize = (camera.top - camera.bottom);
+                const aspect = container.clientWidth / container.clientHeight;
+                const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+                
+                planeMesh.scale.set(
+                    targetWidth * scaleCompensation,
+                    1,
+                    1
+                );
+            }
         }
     }
 
@@ -1368,15 +1450,18 @@ function updateScroll() {
         // Ajuste l'échelle du plan en fonction du zoom de la caméra
         const scaleCompensation = config.initialZoom / camera.zoom;
         
-        // Calcul de la largeur en fonction de la progression
+        // Calcul de la largeur et de l'opacité en fonction de la progression
         let widthScale = 1;
+        let opacity = 1;
         
-        // Réduction de la largeur entre 48% et 50%
+        // Disparition progressive de la ligne entre 48% et 50%
         if (scrollProgress >= 48.0 && scrollProgress <= 50.0) {
             const fadeProgress = (scrollProgress - 48.0) / 2.0;
             widthScale = Math.max(0, 1 - fadeProgress);
+            opacity = Math.max(0, 1 - fadeProgress);
         } else if (scrollProgress > 50.0) {
             widthScale = 0;
+            opacity = 0;
         }
         
         // Calcul de la largeur avec le facteur de largeur personnalisé
@@ -1384,11 +1469,16 @@ function updateScroll() {
         const aspect = container.clientWidth / container.clientHeight;
         const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
         
+        // Appliquer l'échelle
         planeMesh.scale.set(
             targetWidth * scaleCompensation * widthScale,
             1,
             1
         );
+        
+        // Appliquer l'opacité au matériau
+        planeMesh.material.opacity = opacity;
+        planeMesh.visible = opacity > 0;
     }
 }
 
@@ -1635,5 +1725,73 @@ function setupControls() {
     }
 }
 
+// Optimisation des événements de redimensionnement
+let resizeTimeout;
+const resizeThrottleTime = 150;
+
+function handleResize() {
+    if (!resizeTimeout) {
+        resizeTimeout = setTimeout(() => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            
+            renderer.setSize(width, height, false);
+            
+            resizeTimeout = null;
+        }, resizeThrottleTime);
+    }
+}
+
+// Optimisation de la visibilité
+let isCanvasVisible = true;
+const createObserver = (container) => {
+    const observer = new IntersectionObserver((entries) => {
+        isCanvasVisible = entries[0].isIntersecting;
+    }, {
+        threshold: 0.1
+    });
+    
+    observer.observe(container);
+    return observer;
+};
+
+// Nettoyage des ressources
+function dispose() {
+    if (visibilityObserver) {
+        visibilityObserver.disconnect();
+    }
+    if (prewarmObserver) {
+        prewarmObserver.disconnect();
+    }
+    window.removeEventListener('resize', handleResize);
+    
+    if (geometry) geometry.dispose();
+    if (material) material.dispose();
+    if (renderer) renderer.dispose();
+    
+    // Nettoyage des caches
+    for (const key in particleCache) {
+        if (particleCache[key] && particleCache[key].length) {
+            particleCache[key] = null;
+        }
+    }
+    
+    for (const key in mathCache) {
+        if (mathCache[key] && mathCache[key].length) {
+            mathCache[key] = null;
+        }
+    }
+}
+
+// Gestion du cycle de vie
+window.addEventListener('resize', handleResize);
+window.addEventListener('beforeunload', dispose);
+
 // Démarrage
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+    // L'observer sera créé dans init() une fois que le container est disponible
+});

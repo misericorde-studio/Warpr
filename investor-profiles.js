@@ -22,7 +22,7 @@ const config = {
     cameraNear: 1,
     cameraFar: 2.2,
     initialFar: 2.2,
-    finalFar: 3.5,
+    finalFar: 4.5,
     clipPlaneHeight: 0.5,
     clipPlanePosition: 0.0,
     // Configuration de la bordure
@@ -385,29 +385,38 @@ function animate(timestamp) {
             }
         }
 
-        // Gestion du zoom et de la distance max
-        if (scrollProgress < 40) {
+        // Gestion du zoom
+        if (scrollProgress < 60) {
             targetZoom = config.initialZoom;
-            targetFar = config.initialFar;
-        } else if (scrollProgress >= 40 && scrollProgress <= 80) {
-            const progress = (scrollProgress - 40) / 40;
-            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
-            targetFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
+        } else if (scrollProgress >= 60 && scrollProgress <= 84) {
+            const zoomProgress = Math.min(1, (scrollProgress - 60) / 24);
+            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
         } else {
             targetZoom = config.finalZoom;
+        }
+
+        // Gestion de la distance maximale de la caméra (séparée du zoom)
+        if (scrollProgress < 48) {
+            targetFar = config.initialFar;
+        } else if (scrollProgress >= 48 && scrollProgress <= 60) {
+            const farProgress = Math.min(1, (scrollProgress - 48) / 12);
+            targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
+        } else {
             targetFar = config.finalFar;
         }
 
         // Interpolation douce avec Lenis
         if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp;
+            const lerpFactor = window.lenis.options.lerp * 1.5;
             
-            // Interpolation du zoom
-            currentZoom += (targetZoom - currentZoom) * lerpFactor;
+            // Interpolation du zoom avec limitation de la variation
+            const zoomDelta = (targetZoom - currentZoom) * lerpFactor;
+            currentZoom += Math.abs(zoomDelta) > 0.0001 ? zoomDelta : (targetZoom - currentZoom);
             camera.zoom = currentZoom;
             
-            // Interpolation de la distance far
-            currentFar += (targetFar - currentFar) * lerpFactor;
+            // Interpolation de la distance far avec limitation de la variation
+            const farDelta = (targetFar - currentFar) * lerpFactor;
+            currentFar += Math.abs(farDelta) > 0.0001 ? farDelta : (targetFar - currentFar);
             camera.far = currentFar;
             camera.near = Math.max(0.1, currentFar * 0.1);
             
@@ -1288,150 +1297,50 @@ function updateScroll() {
         particles.rotation.y = rotationY;
 
         // Rotation X de 0° à -90° entre 60% et 90% de scroll (sens inverse)
-        if (animationProgress > 60) {
-            const rotationX = -((animationProgress - 60) / 30) * (90 * Math.PI / 180);
+        if (scrollProgress > 60) {
+            const rotationX = -((scrollProgress - 60) / 30) * (90 * Math.PI / 180);
             particles.rotation.x = rotationX;
-
-            // Animation de l'épaisseur pendant la rotation finale (60-90%)
-            const deploymentProgress = (animationProgress - 60) / 30;
-            
-            // Animation des particules - méthode non-saccadée
-            const mainPositions = particles.geometry.attributes.position.array;
-            const mainInitialPos = particles.geometry.attributes.initialPosition.array;
-            const mainFinalPos = particles.geometry.attributes.finalPosition.array;
-            
-            // Entre 60% et 90%, on met à jour toutes les particules à chaque frame
-            if (animationProgress >= 60 && animationProgress <= 90) {
-                // Calculer l'épaisseur radiale maximale (augmente de 0 à 0.1)
-                const maxThickness = ((animationProgress - 60) / 30) * 0.1;
-                const radialOffsets = particles.geometry.attributes.radialOffset.array;
-                
-                // Mettre à jour toutes les particules principales
-                for (let i = 0; i < mainPositions.length; i += 3) {
-                    const particleIndex = i / 3;
-                    // Position de base avec déploiement progressif
-                    const baseX = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
-                    const baseZ = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
-
-                    // Calculer la direction radiale normalisée
-                    const dx = baseX;
-                    const dz = baseZ;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    const dirX = dx / dist;
-                    const dirZ = dz / dist;
-                    
-                    // Utiliser l'offset radial pré-calculé
-                    const radialOffset = radialOffsets[particleIndex] * maxThickness;
-                    
-                    // Appliquer l'offset dans la direction radiale
-                    mainPositions[i] = baseX + dirX * radialOffset;
-                    mainPositions[i + 1] = mainInitialPos[i + 1];
-                    mainPositions[i + 2] = baseZ + dirZ * radialOffset;
-                }
-                particles.geometry.attributes.position.needsUpdate = true;
-            } else if (scrollProgress % 2 === 0) {
-                // En dehors de la plage 60-90%, on continue avec la mise à jour par lots
-                const particlesPerBatch = Math.ceil(mainPositions.length / 9);
-                const batchIndex = Math.floor(scrollProgress % 3);
-                const startIdx = batchIndex * particlesPerBatch * 3;
-                const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
-                
-                for (let i = startIdx; i < endIdx; i += 3) {
-                    mainPositions[i] = mainInitialPos[i] + (mainFinalPos[i] - mainInitialPos[i]) * deploymentProgress;
-                    mainPositions[i + 1] = mainInitialPos[i + 1];
-                    mainPositions[i + 2] = mainInitialPos[i + 2] + (mainFinalPos[i + 2] - mainInitialPos[i + 2]) * deploymentProgress;
-                }
-                particles.geometry.attributes.position.needsUpdate = true;
-            }
-            
-            // Toujours mettre à jour TOUTES les particules de bordure pour éviter les saccades
-            if (borderParticles && borderParticles.geometry) {
-                const positions = borderParticles.geometry.attributes.position.array;
-                const initialPos = borderParticles.geometry.attributes.initialPosition.array;
-                const finalPos = borderParticles.geometry.attributes.finalPosition.array;
-                
-                for (let i = 0; i < positions.length; i += 3) {
-                    positions[i] = initialPos[i] + (finalPos[i] - initialPos[i]) * deploymentProgress;
-                    positions[i + 1] = initialPos[i + 1];
-                    positions[i + 2] = initialPos[i + 2] + (finalPos[i + 2] - initialPos[i + 2]) * deploymentProgress;
-                }
-                borderParticles.geometry.attributes.position.needsUpdate = true;
-            }
         } else {
-            // Réinitialiser la rotation X si on remonte avant 60%
             particles.rotation.x = 0;
-            
-            // Réinitialiser les positions des particules principales par lots,
-            // mais traiter toutes les particules de bordure à chaque fois
-            if (scrollProgress % 5 === 0) {
-                const mainPositions = particles.geometry.attributes.position.array;
-                const mainInitialPos = particles.geometry.attributes.initialPosition.array;
-                
-                // Mise à jour d'un sous-ensemble de particules principales
-                const particlesPerBatch = Math.ceil(mainPositions.length / 15);
-                const batchIndex = Math.floor((scrollProgress / 5) % 5);
-                const startIdx = batchIndex * particlesPerBatch * 3;
-                const endIdx = Math.min(startIdx + particlesPerBatch * 3, mainPositions.length);
-                
-                for (let i = startIdx; i < endIdx; i += 3) {
-                    mainPositions[i] = mainInitialPos[i];
-                    mainPositions[i + 1] = mainInitialPos[i + 1];
-                    mainPositions[i + 2] = mainInitialPos[i + 2];
-                }
-                particles.geometry.attributes.position.needsUpdate = true;
-                
-                // Réinitialiser toutes les particules de bordure avec une transition plus douce
-                if (borderParticles && borderParticles.geometry) {
-                    const positions = borderParticles.geometry.attributes.position.array;
-                    const initialPos = borderParticles.geometry.attributes.initialPosition.array;
-                    
-                    // Calculer un facteur de transition basé sur le scroll
-                    const transitionFactor = Math.max(0, Math.min(1, scrollProgress / 5));
-                    
-                    for (let i = 0; i < positions.length; i += 3) {
-                        // Position actuelle
-                        const currentX = positions[i];
-                        const currentY = positions[i + 1];
-                        const currentZ = positions[i + 2];
-                        
-                        // Position initiale
-                        const targetX = initialPos[i];
-                        const targetY = initialPos[i + 1];
-                        const targetZ = initialPos[i + 2];
-                        
-                        // Interpolation douce entre la position actuelle et la position initiale
-                        positions[i] = currentX + (targetX - currentX) * transitionFactor;
-                        positions[i + 1] = currentY + (targetY - currentY) * transitionFactor;
-                        positions[i + 2] = currentZ + (targetZ - currentZ) * transitionFactor;
-                    }
-                    borderParticles.geometry.attributes.position.needsUpdate = true;
-                }
-            }
         }
 
-        // Gestion du zoom et de la distance max avec Lenis
-        if (animationProgress < 40) {  // En dessous de 40%
+        // Appliquer les rotations à la bordure
+        if (borderParticles) {
+            borderParticles.rotation.copy(particles.rotation);
+        }
+
+        // Gestion du zoom
+        if (scrollProgress < 60) {
             targetZoom = config.initialZoom;
-            targetFar = config.initialFar;
-        } else if (animationProgress >= 40 && animationProgress <= 80) {
-            const progress = (animationProgress - 40) / 40;
-            targetFar = config.initialFar + (config.finalFar - config.initialFar) * progress;
-            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * progress;
+        } else if (scrollProgress >= 60 && scrollProgress <= 84) {
+            const zoomProgress = Math.min(1, (scrollProgress - 60) / 24);
+            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
         } else {
             targetZoom = config.finalZoom;
+        }
+
+        // Gestion de la distance maximale de la caméra (séparée du zoom)
+        if (scrollProgress < 48) {
+            targetFar = config.initialFar;
+        } else if (scrollProgress >= 48 && scrollProgress <= 60) {
+            const farProgress = Math.min(1, (scrollProgress - 48) / 12);
+            targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
+        } else {
             targetFar = config.finalFar;
         }
 
         // Interpolation douce avec Lenis
         if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp;
+            const lerpFactor = window.lenis.options.lerp * 1.5;
             
-            // Interpolation du zoom
-            currentZoom += (targetZoom - currentZoom) * lerpFactor;
+            // Interpolation du zoom avec limitation de la variation
+            const zoomDelta = (targetZoom - currentZoom) * lerpFactor;
+            currentZoom += Math.abs(zoomDelta) > 0.0001 ? zoomDelta : (targetZoom - currentZoom);
             camera.zoom = currentZoom;
             
-            // Interpolation de la distance far
-            currentFar += (targetFar - currentFar) * lerpFactor;
+            // Interpolation de la distance far avec limitation de la variation
+            const farDelta = (targetFar - currentFar) * lerpFactor;
+            currentFar += Math.abs(farDelta) > 0.0001 ? farDelta : (targetFar - currentFar);
             camera.far = currentFar;
             camera.near = Math.max(0.1, currentFar * 0.1);
             

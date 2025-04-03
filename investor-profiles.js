@@ -171,25 +171,33 @@ function init() {
     lastFrameTime = performance.now();
     animate(lastFrameTime);
 
-    // Création du plan vert
-    const viewWidth = camera.right - camera.left;
-    const planeWidth = (viewWidth * config.greenLine.width) / 100;
-    const planeGeometry = new THREE.PlaneGeometry(planeWidth, config.greenLine.height);
-    const planeMaterial = new THREE.MeshBasicMaterial({
+    // Création de la ligne de seuil
+    const thresholdLineGeometry = new THREE.BufferGeometry();
+    const lineWidth = 2 * config.radius; // Même largeur que le cercle
+    const vertices = new Float32Array([
+        -lineWidth/2, 0, 0,
+        lineWidth/2, 0, 0
+    ]);
+    thresholdLineGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+    const thresholdLineMaterial = new THREE.LineBasicMaterial({
         color: 0x00FEA5,
+        linewidth: 2,
         transparent: true,
         opacity: 0.8,
-        side: THREE.DoubleSide,
         depthTest: false,
         depthWrite: false,
         blending: THREE.AdditiveBlending
     });
-    
-    planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-    planeMesh.renderOrder = 999;
-    planeMesh.position.set(0, (config.clipPlanePosition - config.clipPlaneHeight) * 2, -1.5);
-    planeMesh.frustumCulled = false;
-    scene.add(planeMesh);
+
+    const thresholdLine = new THREE.Line(thresholdLineGeometry, thresholdLineMaterial);
+    thresholdLine.renderOrder = 999;
+    thresholdLine.position.set(0, config.clipPlanePosition - config.clipPlaneHeight, -1.5);
+    thresholdLine.frustumCulled = false;
+    scene.add(thresholdLine);
+
+    // Remplacer planeMesh par thresholdLine dans les références
+    planeMesh = thresholdLine;
 }
 
 // Animation optimisée
@@ -535,6 +543,7 @@ function createParticles() {
             attribute float phase;
             
             varying vec4 vClipPos;
+            varying float vY;
             
             void main() {
                 // Calculer le mouvement de flottement
@@ -550,6 +559,7 @@ function createParticles() {
                 vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;
+                vY = finalPosition.y;
                 gl_PointSize = pointSize * scaleFactor;
             }
         `,
@@ -559,19 +569,17 @@ function createParticles() {
             uniform sampler2D pointTexture;
             
             varying vec4 vClipPos;
+            varying float vY;
             
             void main() {
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
                 
-                // Normaliser la position dans l'espace de clip
-                vec3 ndc = vClipPos.xyz / vClipPos.w;
-                
                 vec3 color = vec3(1.0);
-                // Si la particule est dans la zone verte (au-dessus de clipPlanePosition - clipPlaneHeight)
-                float planeBottom = clipPlanePosition - clipPlaneHeight;
-                if (ndc.y >= planeBottom) {
+                float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
+                
+                if (vY >= threshold) {
                     color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
@@ -697,6 +705,7 @@ function createParticles() {
             attribute float phase;
             
             varying vec4 vClipPos;
+            varying float vY;
             
             void main() {
                 // Calculer le mouvement de flottement
@@ -712,6 +721,7 @@ function createParticles() {
                 vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;
+                vY = finalPosition.y;
                 gl_PointSize = pointSize * scaleFactor;
             }
         `,
@@ -721,19 +731,17 @@ function createParticles() {
             uniform sampler2D pointTexture;
             
             varying vec4 vClipPos;
+            varying float vY;
             
             void main() {
                 vec2 center = vec2(0.5, 0.5);
                 float dist = length(gl_PointCoord - center);
                 float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
                 
-                // Normaliser la position dans l'espace de clip
-                vec3 ndc = vClipPos.xyz / vClipPos.w;
-                
                 vec3 color = vec3(1.0);
-                // Si la particule est dans la zone verte (au-dessus de clipPlanePosition - clipPlaneHeight)
-                float planeBottom = clipPlanePosition - clipPlaneHeight;
-                if (ndc.y >= planeBottom) {
+                float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
+                
+                if (vY >= threshold) {
                     color = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 }
                 
@@ -1117,6 +1125,11 @@ function updateScroll() {
         // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
         const worldY = planeBottom * 2;
         planeMesh.position.y = worldY;
+        
+        // Mettre à jour la position dans le shader des particules
+        if (particles && particles.material.uniforms) {
+            particles.material.uniforms.linePosition.value = worldY;
+        }
         
         // Ajuste l'échelle du plan en fonction du zoom de la caméra
         const scaleCompensation = config.initialZoom / camera.zoom;

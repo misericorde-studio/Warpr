@@ -279,11 +279,22 @@ function animate(timestamp) {
                 // Utiliser l'offset radial pré-calculé
                 const radialOffset = radialOffsets[particleIndex] * maxThickness;
 
-                // Effet de flottement avec vitesse et amplitude augmentées
-                const phase = particleIndex * 0.1;
-                const floatX = Math.sin(time * 0.8 + phase) * 0.008;
-                const floatY = Math.cos(time * 0.7 + phase) * 0.008;
-                const floatZ = Math.sin(time * 0.9 + phase) * 0.008;
+                // Effet de flottement avec variations individuelles
+                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
+                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
+                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
+                
+                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
+                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
+                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
+                
+                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
+                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
+                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+
+                const floatX = Math.sin(time * freqX + phaseX) * ampX;
+                const floatY = Math.cos(time * freqY + phaseY) * ampY;
+                const floatZ = Math.sin(time * freqZ + phaseZ) * ampZ;
                 
                 // Appliquer les deux effets
                 positions[i] = baseX + dirX * radialOffset + floatX;
@@ -294,11 +305,22 @@ function animate(timestamp) {
             // En dessous de 60%, appliquer uniquement l'effet de flottement
             for (let i = 0; i < positions.length; i += 3) {
                 const particleIndex = i / 3;
-                const phase = particleIndex * 0.1;
                 
-                positions[i] = initialPositions[i] + Math.sin(time * 0.8 + phase) * 0.008;
-                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * 0.7 + phase) * 0.008;
-                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * 0.9 + phase) * 0.008;
+                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
+                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
+                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
+                
+                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
+                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
+                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
+                
+                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
+                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
+                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+
+                positions[i] = initialPositions[i] + Math.sin(time * freqX + phaseX) * ampX;
+                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * freqY + phaseY) * ampY;
+                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * freqZ + phaseZ) * ampZ;
             }
         }
         particles.geometry.attributes.position.needsUpdate = true;
@@ -316,27 +338,49 @@ function animate(timestamp) {
             
             for (let i = 0; i < positions.length; i += 3) {
                 const particleIndex = i / 3;
-                const phase = particleIndex * 0.1;
                 
                 // Position de base avec déploiement
                 const baseX = initialPositions[i] + (finalPositions[i] - initialPositions[i]) * deploymentProgress;
                 const baseY = initialPositions[i + 1];
                 const baseZ = initialPositions[i + 2] + (finalPositions[i + 2] - initialPositions[i + 2]) * deploymentProgress;
                 
-                // Ajouter l'effet de flottement avec vitesse et amplitude augmentées
-                positions[i] = baseX + Math.sin(time * 0.8 + phase) * 0.008;
-                positions[i + 1] = baseY + Math.cos(time * 0.7 + phase) * 0.008;
-                positions[i + 2] = baseZ + Math.sin(time * 0.9 + phase) * 0.008;
+                // Effet de flottement avec variations individuelles
+                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
+                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
+                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
+                
+                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
+                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
+                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
+                
+                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
+                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
+                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+
+                positions[i] = baseX + Math.sin(time * freqX + phaseX) * ampX;
+                positions[i + 1] = baseY + Math.cos(time * freqY + phaseY) * ampY;
+                positions[i + 2] = baseZ + Math.sin(time * freqZ + phaseZ) * ampZ;
             }
         } else {
             // En dessous de 60%, appliquer uniquement l'effet de flottement
             for (let i = 0; i < positions.length; i += 3) {
                 const particleIndex = i / 3;
-                const phase = particleIndex * 0.1;
                 
-                positions[i] = initialPositions[i] + Math.sin(time * 0.8 + phase) * 0.008;
-                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * 0.7 + phase) * 0.008;
-                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * 0.9 + phase) * 0.008;
+                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
+                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
+                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
+                
+                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
+                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
+                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
+                
+                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
+                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
+                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+
+                positions[i] = initialPositions[i] + Math.sin(time * freqX + phaseX) * ampX;
+                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * freqY + phaseY) * ampY;
+                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * freqZ + phaseZ) * ampZ;
             }
         }
         borderParticles.geometry.attributes.position.needsUpdate = true;

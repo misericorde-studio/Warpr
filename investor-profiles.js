@@ -35,7 +35,7 @@ const config = {
     thicknessVariationMultiplier: 5.0,
     // Configuration du rectangle vert
     greenLine: {
-        width: 32, // Pourcentage de la largeur du viewport
+        width: 0.58, // Largeur de la ligne verte
         height: 0.02
     }
 };
@@ -173,7 +173,7 @@ function init() {
 
     // Création de la ligne de seuil
     const thresholdLineGeometry = new THREE.BufferGeometry();
-    const lineWidth = 2 * config.radius; // Même largeur que le cercle
+    const lineWidth = 1; // Largeur de base de 1 unité
     const vertices = new Float32Array([
         -lineWidth/2, 0, 0,
         lineWidth/2, 0, 0
@@ -846,12 +846,10 @@ function throttle(func, limit) {
 
 // Optimisation de la mise à jour des couleurs
 function updateClipPlane() {
-    if (!particles) return;
+    if (!particles || !particles.material || !particles.material.uniforms) return;
     
-    if (particles.material && particles.material.uniforms) {
-        particles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
-        particles.material.uniforms.clipPlanePosition.value = config.clipPlanePosition;
-    }
+    particles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
+    particles.material.uniforms.clipPlanePosition.value = config.clipPlanePosition;
 
     if (borderParticles && borderParticles.material && borderParticles.material.uniforms) {
         borderParticles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
@@ -1127,7 +1125,7 @@ function updateScroll() {
         planeMesh.position.y = worldY;
         
         // Mettre à jour la position dans le shader des particules
-        if (particles && particles.material.uniforms) {
+        if (particles && particles.material && particles.material.uniforms && particles.material.uniforms.linePosition) {
             particles.material.uniforms.linePosition.value = worldY;
         }
         
@@ -1145,8 +1143,13 @@ function updateScroll() {
             widthScale = 0;
         }
         
+        // Calcul de la largeur avec le facteur de largeur personnalisé
+        const frustumSize = (camera.top - camera.bottom);
+        const aspect = container.clientWidth / container.clientHeight;
+        const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+        
         planeMesh.scale.set(
-            (container.clientWidth / 1920) * 2 * scaleCompensation * widthScale,
+            targetWidth * scaleCompensation * widthScale,
             1,
             1
         );
@@ -1209,20 +1212,18 @@ function setupControls() {
     const toggleControlsBtn = document.getElementById('toggle-controls');
     const showControlsBtn = document.getElementById('show-controls');
     const controlsPanel = document.getElementById('controls-panel');
-    const greenThresholdControl = document.getElementById('green-threshold');
-    const greenThresholdValue = document.getElementById('green-threshold-value');
     const cameraFarControl = document.getElementById('camera-far');
     const cameraFarValue = document.getElementById('camera-far-value');
     const clipPlaneHeightControl = document.getElementById('clip-plane-height');
     const clipPlaneHeightValue = document.getElementById('clip-plane-height-value');
     const clipPlanePositionControl = document.getElementById('clip-plane-position');
     const clipPlanePositionValue = document.getElementById('clip-plane-position-value');
-    const greenLineWidthControl = document.getElementById('green-line-width');
-    const greenLineWidthValue = document.getElementById('green-line-width-value');
     const initialZoomControl = document.getElementById('initial-zoom');
     const initialZoomValue = document.getElementById('initial-zoom-value');
     const finalZoomControl = document.getElementById('final-zoom');
     const finalZoomValue = document.getElementById('final-zoom-value');
+    const lineWidthControl = document.getElementById('line-width');
+    const lineWidthValue = document.getElementById('line-width-value');
 
     // Gestion de l'affichage/masquage du panneau de contrôle
     toggleControlsBtn.addEventListener('click', () => {
@@ -1307,13 +1308,6 @@ function setupControls() {
         updateParticles();
     });
 
-    greenThresholdControl.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        config.greenThreshold = value;
-        greenThresholdValue.textContent = value.toFixed(2);
-        updateParticles();
-    });
-
     cameraFarControl.addEventListener('input', (e) => {
         const value = parseFloat(e.target.value);
         config.finalFar = value;
@@ -1384,19 +1378,22 @@ function setupControls() {
         });
     }
 
-    if (greenLineWidthControl) {
-        greenLineWidthControl.addEventListener('input', (e) => {
-            const widthPercent = parseFloat(e.target.value);
-            greenLineWidthValue.textContent = widthPercent;
+    // Gestionnaire pour la largeur de la ligne verte
+    if (lineWidthControl) {
+        lineWidthControl.value = config.greenLine.width;
+        lineWidthValue.textContent = config.greenLine.width.toFixed(1);
+        
+        lineWidthControl.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            config.greenLine.width = value;
+            lineWidthValue.textContent = value.toFixed(1);
             
-            // Calculer la largeur en unités Three.js basée sur le pourcentage
-            const viewWidth = camera.right - camera.left;
-            const newWidth = (viewWidth * widthPercent) / 100;
-            
-            // Mettre à jour la géométrie du plan
+            // Forcer une mise à jour immédiate de la largeur
             if (planeMesh) {
-                planeMesh.geometry.dispose();
-                planeMesh.geometry = new THREE.PlaneGeometry(newWidth, config.greenLine.height);
+                const frustumSize = (camera.top - camera.bottom);
+                const aspect = container.clientWidth / container.clientHeight;
+                const targetWidth = frustumSize * aspect * 0.5 * value;
+                planeMesh.scale.x = targetWidth;
             }
         });
     }

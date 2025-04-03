@@ -49,10 +49,15 @@ let heightVariation = 0.22;
 let lineThickness = 0.030;
 let lastScrollY = 0;
 let lastFrameTime = 0;
-let thresholdContainer, thresholdLine; // Cache pour les éléments DOM fréquemment utilisés
-let particleShader, borderShader; // Cache pour les shaders
+let thresholdContainer, thresholdLine;
+let particleShader, borderShader;
 let isScrolling = false;
 let scrollTimeout;
+let hasPrewarmed = false;
+let targetRotationY = 0;
+let currentRotationY = 0;
+let targetRotationX = 0;
+let currentRotationX = 0;
 
 // Tableaux de positions
 let mainInitialPositions;
@@ -67,6 +72,24 @@ let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 // Ajouter ces variables au début du fichier
 let progressBar, progressValue;
 let planeMesh;
+
+// Pré-allocation des vecteurs et matrices pour éviter les allocations pendant l'animation
+const tempVector = new THREE.Vector3();
+const tempQuaternion = new THREE.Quaternion();
+const tempMatrix = new THREE.Matrix4();
+
+// Cache pour les calculs de particules
+const particleCache = {
+    positions: null,
+    rotations: null,
+    phases: null,
+    offsets: null,
+    deploymentProgress: null,
+    thicknessProgress: null,
+    borderPhases: null,
+    borderDeploymentProgress: null,
+    borderRadialProgress: null
+};
 
 // Fonction de bruit 1D simplifiée
 function noise1D(x) {
@@ -84,6 +107,15 @@ function noise1D(x) {
 // Interpolation linéaire
 function lerp(a, b, t) {
     return a + t * (b - a);
+}
+
+// Fonctions d'interpolation pour des transitions plus fluides
+function easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
+}
+
+function easeInOutCubic(x) {
+    return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 }
 
 // Initialisation
@@ -118,16 +150,44 @@ function init() {
     camera.zoom = config.initialZoom;
     camera.updateProjectionMatrix();
 
-    // Renderer
+    // Renderer avec optimisations spécifiques pour Chrome
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
-        alpha: true
+        alpha: false, // Désactive l'alpha pour améliorer les performances
+        powerPreference: 'high-performance',
+        stencil: false,
+        depth: false,
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false
     });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    container.appendChild(renderer.domElement);
     
+    // Optimisations du renderer
+    renderer.setSize(container.clientWidth, container.clientHeight, false);
+    renderer.setPixelRatio(1); // Force un pixel ratio de 1 pour de meilleures performances
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    
+    // Désactive les fonctionnalités non utilisées
+    renderer.shadowMap.enabled = false;
+    renderer.physicallyCorrectLights = false;
+    
+    container.appendChild(renderer.domElement);
+
+    // Initialiser l'IntersectionObserver pour le préchauffage
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !hasPrewarmed) {
+                // Préchauffer le GPU avec quelques frames
+                prewarmRenderer();
+                hasPrewarmed = true;
+            }
+        });
+    }, {
+        rootMargin: '100px 0px', // Commence l'observation 100px avant que l'élément soit visible
+        threshold: 0
+    });
+
+    observer.observe(container);
+
     // Horloge
     clock = new THREE.Clock();
 
@@ -198,198 +258,340 @@ function init() {
 
     // Remplacer planeMesh par thresholdLine dans les références
     planeMesh = thresholdLine;
+
+    // Pré-allocation du cache de particules
+    initializeParticleCache();
+}
+
+// Initialisation du cache de particules
+function initializeParticleCache() {
+    const totalParticles = config.particleCount + config.borderParticleCount;
+    particleCache.positions = new Float32Array(totalParticles * 3);
+    particleCache.rotations = new Float32Array(totalParticles * 4);
+    particleCache.phases = new Float32Array(totalParticles);
+    particleCache.offsets = new Float32Array(totalParticles * 3);
 }
 
 // Animation optimisée
 function animate(timestamp) {
     requestAnimationFrame(animate);
     
-    // Mise à jour de Lenis
-    if (window.lenis) {
+    // Mise à jour de Lenis avec throttling
+    if (window.lenis && (timestamp - lastFrameTime >= 16)) {
         window.lenis.raf(timestamp);
     }
     
-    // Mise à jour de la barre de progression avec le pourcentage de la section airdrop
-    let scrollProgress = 0;
-    if (progressBar && progressValue) {
-        const airdropSection = document.querySelector('.airdrop');
-        const airdropRect = airdropSection.getBoundingClientRect();
-        const windowHeight = window.innerHeight;
-        
-        // Calcul du point où la section atteint 60% du viewport
-        const startPoint = windowHeight * 0.6;
-        const sectionTop = airdropRect.top;
-        
-        if (sectionTop > startPoint) {
-            progressBar.style.setProperty('--progress', '0%');
-            progressValue.textContent = '[ 0% ]';
-            scrollProgress = 0;
-        }
-        else if (airdropRect.bottom <= 0) {
-            progressBar.style.setProperty('--progress', '100%');
-            progressValue.textContent = '[ 100% ]';
-            scrollProgress = 100;
-        }
-        else {
-            const totalHeight = airdropRect.height - windowHeight;
-            const currentScroll = -airdropRect.top;
-            const scrollAtStart = -startPoint;
-            const adjustedScroll = currentScroll - scrollAtStart;
-            const adjustedTotal = totalHeight - scrollAtStart;
-            scrollProgress = Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
-            
-            progressBar.style.setProperty('--progress', `${scrollProgress}%`);
-            progressValue.textContent = `[ ${scrollProgress}% ]`;
-        }
-    }
-    
-    // Limite le framerate à ~60fps
-    if (timestamp - lastFrameTime < 16) {
+    // Limite le framerate à ~60fps avec une marge de tolérance
+    if (timestamp - lastFrameTime < 15.5) {
         return;
     }
+    
     lastFrameTime = timestamp;
 
-    // Animation des particules principales
-    if (particles && particles.geometry) {
-        const positions = particles.geometry.attributes.position.array;
-        const initialPositions = particles.geometry.attributes.initialPosition.array;
-        const finalPositions = particles.geometry.attributes.finalPosition.array;
-        const radialOffsets = particles.geometry.attributes.radialOffset.array;
-        const time = timestamp * 0.001;
-
-        // Entre 60% et au-delà, on met à jour toutes les particules à chaque frame
-        if (scrollProgress >= 60) {
-            // Calculer l'épaisseur radiale maximale (augmente de 0 à 0.1)
-            const deploymentProgress = Math.min(1, (scrollProgress - 60) / 30);
-            const maxThickness = Math.min(0.1, ((scrollProgress - 60) / 30) * 0.1);
-            
-            for (let i = 0; i < positions.length; i += 3) {
-                const particleIndex = i / 3;
-                // Position de base avec déploiement progressif
-                const baseX = initialPositions[i] + (finalPositions[i] - initialPositions[i]) * deploymentProgress;
-                const baseZ = initialPositions[i + 2] + (finalPositions[i + 2] - initialPositions[i + 2]) * deploymentProgress;
-
-                // Calculer la direction radiale normalisée
-                const dx = baseX;
-                const dz = baseZ;
-                const dist = Math.sqrt(dx * dx + dz * dz);
-                const dirX = dx / dist;
-                const dirZ = dz / dist;
-                
-                // Utiliser l'offset radial pré-calculé
-                const radialOffset = radialOffsets[particleIndex] * maxThickness;
-
-                // Effet de flottement avec variations individuelles
-                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
-                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
-                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
-                
-                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
-                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
-                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
-                
-                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
-                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
-                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
-
-                const floatX = Math.sin(time * freqX + phaseX) * ampX;
-                const floatY = Math.cos(time * freqY + phaseY) * ampY;
-                const floatZ = Math.sin(time * freqZ + phaseZ) * ampZ;
-                
-                // Appliquer les deux effets
-                positions[i] = baseX + dirX * radialOffset + floatX;
-                positions[i + 1] = initialPositions[i + 1] + floatY;
-                positions[i + 2] = baseZ + dirZ * radialOffset + floatZ;
-            }
+    // Calcul du scroll progress une seule fois
+    const scrollProgress = calculateScrollProgress();
+    
+    // Animation des rotations avec Lenis
+    if (particles) {
+        // Calcul des rotations cibles
+        const normalizedProgress = scrollProgress / 100;
+        targetRotationY = -(normalizedProgress) * (180 * Math.PI / 180);
+        
+        if (scrollProgress > 60) {
+            const rotationProgress = (scrollProgress - 60) / 30;
+            targetRotationX = -(Math.min(1, rotationProgress)) * (90 * Math.PI / 180);
         } else {
-            // En dessous de 60%, appliquer uniquement l'effet de flottement
-            for (let i = 0; i < positions.length; i += 3) {
-                const particleIndex = i / 3;
-                
-                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
-                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
-                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
-                
-                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
-                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
-                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
-                
-                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
-                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
-                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+            targetRotationX = 0;
+        }
 
-                positions[i] = initialPositions[i] + Math.sin(time * freqX + phaseX) * ampX;
-                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * freqY + phaseY) * ampY;
-                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * freqZ + phaseZ) * ampZ;
+        // Utilisation de Lenis pour l'interpolation
+        if (window.lenis) {
+            // Interpolation douce avec les paramètres de Lenis
+            const rotationLerp = window.lenis.options.lerp;
+            
+            // Interpolation de la rotation Y
+            currentRotationY += (targetRotationY - currentRotationY) * rotationLerp;
+            particles.rotation.y = currentRotationY;
+            
+            // Interpolation de la rotation X
+            currentRotationX += (targetRotationX - currentRotationX) * rotationLerp;
+            particles.rotation.x = currentRotationX;
+
+            // Appliquer les rotations à la bordure
+            if (borderParticles) {
+                borderParticles.rotation.copy(particles.rotation);
             }
         }
-        particles.geometry.attributes.position.needsUpdate = true;
     }
 
-    // Animation des particules de bordure avec flottement
+    // Mise à jour des particules
+    if (particles && particles.geometry) {
+        updateParticlesOptimized(timestamp, scrollProgress);
+    }
+
+    // Mise à jour des particules de bordure
     if (borderParticles && borderParticles.geometry) {
-        const positions = borderParticles.geometry.attributes.position.array;
-        const initialPositions = borderParticles.geometry.attributes.initialPosition.array;
-        const finalPositions = borderParticles.geometry.attributes.finalPosition.array;
-        const time = timestamp * 0.001;
+        updateBorderParticlesOptimized(timestamp, scrollProgress);
+    }
 
-        if (scrollProgress >= 60) {
-            const deploymentProgress = Math.min(1, (scrollProgress - 60) / 30);
-            
-            for (let i = 0; i < positions.length; i += 3) {
-                const particleIndex = i / 3;
-                
-                // Position de base avec déploiement
-                const baseX = initialPositions[i] + (finalPositions[i] - initialPositions[i]) * deploymentProgress;
-                const baseY = initialPositions[i + 1];
-                const baseZ = initialPositions[i + 2] + (finalPositions[i + 2] - initialPositions[i + 2]) * deploymentProgress;
-                
-                // Effet de flottement avec variations individuelles
-                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
-                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
-                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
-                
-                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
-                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
-                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
-                
-                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
-                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
-                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+    // Rendu optimisé
+    renderer.render(scene, camera);
+}
 
-                positions[i] = baseX + Math.sin(time * freqX + phaseX) * ampX;
-                positions[i + 1] = baseY + Math.cos(time * freqY + phaseY) * ampY;
-                positions[i + 2] = baseZ + Math.sin(time * freqZ + phaseZ) * ampZ;
-            }
-        } else {
-            // En dessous de 60%, appliquer uniquement l'effet de flottement
-            for (let i = 0; i < positions.length; i += 3) {
-                const particleIndex = i / 3;
-                
-                const phaseX = Math.sin(particleIndex * 0.4) * Math.PI * 2;
-                const phaseY = Math.cos(particleIndex * 0.5) * Math.PI * 2;
-                const phaseZ = Math.sin(particleIndex * 0.6) * Math.PI * 2;
-                
-                const freqX = 1.5 + Math.sin(particleIndex * 0.7) * 0.5;
-                const freqY = 1.8 + Math.cos(particleIndex * 0.8) * 0.5;
-                const freqZ = 2.0 + Math.sin(particleIndex * 0.9) * 0.5;
-                
-                const ampX = 0.015 + Math.sin(particleIndex * 1.1) * 0.005;
-                const ampY = 0.015 + Math.cos(particleIndex * 1.2) * 0.005;
-                const ampZ = 0.015 + Math.sin(particleIndex * 1.3) * 0.005;
+// Nouvelle fonction pour la mise à jour des particules de bordure
+function updateBorderParticlesOptimized(timestamp, scrollProgress) {
+    const positions = borderParticles.geometry.attributes.position.array;
+    const initialPositions = borderParticles.geometry.attributes.initialPosition.array;
+    const finalPositions = borderParticles.geometry.attributes.finalPosition.array;
+    const time = timestamp * 0.001;
 
-                positions[i] = initialPositions[i] + Math.sin(time * freqX + phaseX) * ampX;
-                positions[i + 1] = initialPositions[i + 1] + Math.cos(time * freqY + phaseY) * ampY;
-                positions[i + 2] = initialPositions[i + 2] + Math.sin(time * freqZ + phaseZ) * ampZ;
-            }
+    // Utilisation du cache pré-alloué pour les calculs
+    const batchSize = 1000;
+    const totalParticles = positions.length / 3;
+    
+    // Utilisation de Lenis pour l'interpolation du déploiement
+    const deploymentLerp = window.lenis ? window.lenis.options.lerp : 0.1;
+    
+    // Initialiser le cache des phases pour les bordures si nécessaire
+    if (!particleCache.borderPhases) {
+        particleCache.borderPhases = new Float32Array(totalParticles);
+        for (let i = 0; i < totalParticles; i++) {
+            particleCache.borderPhases[i] = Math.random() * Math.PI * 2;
         }
-        borderParticles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Initialiser les caches de progression si nécessaire
+    if (!particleCache.borderDeploymentProgress) {
+        particleCache.borderDeploymentProgress = new Float32Array(totalParticles);
+    }
+    if (!particleCache.borderRadialProgress) {
+        particleCache.borderRadialProgress = new Float32Array(totalParticles);
     }
     
-    // Rendu de la scène
-    renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
-    renderer.setClearColor(config.backgroundColor);
-    renderer.render(scene, camera);
+    // Calculer les valeurs cibles en fonction du scroll
+    const isDeploying = scrollProgress >= 60;
+    const deploymentProgress = isDeploying ? (scrollProgress - 60) / 30 : 0;
+    const targetDeployment = Math.min(1, deploymentProgress);
+    const targetRadial = Math.min(1, deploymentProgress);
+    
+    for (let batch = 0; batch < totalParticles; batch += batchSize) {
+        const end = Math.min(batch + batchSize, totalParticles);
+        
+        for (let i = batch; i < end; i++) {
+            const i3 = i * 3;
+            const phase = particleCache.borderPhases[i];
+
+            // Effet de flottement de base (toujours actif)
+            const floatX = Math.sin(time * 1.5 + phase) * 0.015;
+            const floatY = Math.cos(time * 1.8 + phase) * 0.015;
+            const floatZ = Math.sin(time * 2.0 + phase) * 0.015;
+
+            // Position de base
+            let baseX = initialPositions[i3];
+            let baseZ = initialPositions[i3 + 2];
+
+            // Initialiser les progressions si nécessaire
+            if (particleCache.borderDeploymentProgress[i] === undefined) {
+                particleCache.borderDeploymentProgress[i] = 0;
+            }
+            if (particleCache.borderRadialProgress[i] === undefined) {
+                particleCache.borderRadialProgress[i] = 0;
+            }
+
+            // Interpolation des progressions avec Lenis
+            particleCache.borderDeploymentProgress[i] += (targetDeployment - particleCache.borderDeploymentProgress[i]) * deploymentLerp;
+            particleCache.borderRadialProgress[i] += (targetRadial - particleCache.borderRadialProgress[i]) * deploymentLerp;
+
+            const currentDeployment = particleCache.borderDeploymentProgress[i];
+            const currentRadial = particleCache.borderRadialProgress[i];
+
+            // Calculer la position déployée
+            const deployedX = initialPositions[i3] + (finalPositions[i3] - initialPositions[i3]) * currentDeployment;
+            const deployedZ = initialPositions[i3 + 2] + (finalPositions[i3 + 2] - initialPositions[i3 + 2]) * currentDeployment;
+
+            // Calculer la direction radiale
+            const dx = deployedX;
+            const dz = deployedZ;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const dirX = dx / dist;
+            const dirZ = dz / dist;
+
+            // Appliquer l'épaisseur radiale
+            const radialOffset = currentRadial * 0.1;
+            baseX = deployedX + dirX * radialOffset;
+            baseZ = deployedZ + dirZ * radialOffset;
+
+            // Application de la position finale avec le flottement
+            positions[i3] = baseX + floatX;
+            positions[i3 + 1] = initialPositions[i3 + 1] + floatY;
+            positions[i3 + 2] = baseZ + floatZ;
+        }
+    }
+    
+    borderParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// Mise à jour optimisée des particules avec le scroll progress en paramètre
+function updateParticlesOptimized(timestamp, scrollProgress) {
+    const positions = particles.geometry.attributes.position.array;
+    const initialPositions = particles.geometry.attributes.initialPosition.array;
+    const finalPositions = particles.geometry.attributes.finalPosition.array;
+    const radialOffsets = particles.geometry.attributes.radialOffset.array;
+    const time = timestamp * 0.001;
+
+    // Utilisation du cache pré-alloué pour les calculs
+    const batchSize = 1000;
+    const totalParticles = positions.length / 3;
+    
+    // Utilisation de Lenis pour l'interpolation du déploiement
+    const deploymentLerp = window.lenis ? window.lenis.options.lerp : 0.1;
+
+    // Initialiser les caches si nécessaire
+    if (!particleCache.phases) {
+        particleCache.phases = new Float32Array(totalParticles);
+        for (let i = 0; i < totalParticles; i++) {
+            particleCache.phases[i] = Math.random() * Math.PI * 2;
+        }
+    }
+    if (!particleCache.deploymentProgress) {
+        particleCache.deploymentProgress = new Float32Array(totalParticles);
+    }
+    if (!particleCache.thicknessProgress) {
+        particleCache.thicknessProgress = new Float32Array(totalParticles);
+    }
+
+    // Calculer les valeurs cibles en fonction du scroll
+    const isDeploying = scrollProgress >= 60;
+    const deploymentProgress = isDeploying ? (scrollProgress - 60) / 30 : 0;
+    const targetDeployment = Math.min(1, deploymentProgress);
+    const targetThickness = isDeploying ? Math.min(0.1, deploymentProgress * 0.1) : 0;
+    
+    for (let batch = 0; batch < totalParticles; batch += batchSize) {
+        const end = Math.min(batch + batchSize, totalParticles);
+        
+        for (let i = batch; i < end; i++) {
+            const i3 = i * 3;
+            
+            // Réutilisation des valeurs du cache
+            if (!particleCache.phases[i]) {
+                particleCache.phases[i] = Math.random() * Math.PI * 2;
+            }
+            const phase = particleCache.phases[i];
+
+            // Effet de flottement de base (toujours actif)
+            const floatX = Math.sin(time * 1.5 + phase) * 0.015;
+            const floatY = Math.cos(time * 1.8 + phase) * 0.015;
+            const floatZ = Math.sin(time * 2.0 + phase) * 0.015;
+
+            // Position de base
+            let baseX = initialPositions[i3];
+            let baseZ = initialPositions[i3 + 2];
+
+            // Initialiser les progressions si nécessaire
+            if (particleCache.deploymentProgress[i] === undefined) {
+                particleCache.deploymentProgress[i] = 0;
+            }
+            if (particleCache.thicknessProgress[i] === undefined) {
+                particleCache.thicknessProgress[i] = 0;
+            }
+
+            // Interpolation des progressions avec Lenis
+            particleCache.deploymentProgress[i] += (targetDeployment - particleCache.deploymentProgress[i]) * deploymentLerp;
+            particleCache.thicknessProgress[i] += (targetThickness - particleCache.thicknessProgress[i]) * deploymentLerp;
+
+            const currentDeployment = particleCache.deploymentProgress[i];
+            const currentThickness = particleCache.thicknessProgress[i];
+
+            // Calculer la position déployée
+            const deployedX = initialPositions[i3] + (finalPositions[i3] - initialPositions[i3]) * currentDeployment;
+            const deployedZ = initialPositions[i3 + 2] + (finalPositions[i3 + 2] - initialPositions[i3 + 2]) * currentDeployment;
+
+            // Calculer la direction radiale
+            const dx = deployedX;
+            const dz = deployedZ;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const dirX = dx / dist;
+            const dirZ = dz / dist;
+
+            // Appliquer l'épaisseur radiale
+            const radialOffset = radialOffsets[i] * currentThickness;
+            baseX = deployedX + dirX * radialOffset;
+            baseZ = deployedZ + dirZ * radialOffset;
+
+            // Application de la position finale avec le flottement
+            positions[i3] = baseX + floatX;
+            positions[i3 + 1] = initialPositions[i3 + 1] + floatY;
+            positions[i3 + 2] = baseZ + floatZ;
+        }
+    }
+    
+    particles.geometry.attributes.position.needsUpdate = true;
+}
+
+// Calcul optimisé du scroll progress
+function calculateScrollProgress() {
+    const airdropSection = document.querySelector('.airdrop');
+    const airdropRect = airdropSection.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const startPoint = windowHeight * 0.6;
+    const sectionTop = airdropRect.top;
+    
+    if (sectionTop > startPoint || airdropRect.bottom <= 0) {
+        return 0;
+    }
+    
+    const totalHeight = airdropRect.height - windowHeight;
+    const currentScroll = -airdropRect.top;
+    const scrollAtStart = -startPoint;
+    const adjustedScroll = currentScroll - scrollAtStart;
+    const adjustedTotal = totalHeight - scrollAtStart;
+    
+    return Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
+}
+
+// Fonction de préchauffage du renderer
+function prewarmRenderer() {
+    console.log('Préchauffe du renderer...');
+    
+    // Sauvegarder l'état actuel
+    const currentScrollProgress = window.scrollY;
+    
+    // Simuler différents états de scroll pour compiler tous les shaders
+    const testScrollPositions = [0, 30, 60, 90, 100];
+    
+    testScrollPositions.forEach(scrollProgress => {
+        // Simuler les différentes positions de scroll
+        if (particles) {
+            // Rotation Y
+            const rotationY = -(scrollProgress / 100) * (180 * Math.PI / 180);
+            particles.rotation.y = rotationY;
+
+            // Rotation X (entre 60% et 90%)
+            if (scrollProgress > 60) {
+                const rotationX = -((Math.min(scrollProgress, 90) - 60) / 30) * (90 * Math.PI / 180);
+                particles.rotation.x = rotationX;
+            } else {
+                particles.rotation.x = 0;
+            }
+
+            if (borderParticles) {
+                borderParticles.rotation.copy(particles.rotation);
+            }
+        }
+
+        // Forcer le rendu
+        renderer.render(scene, camera);
+    });
+
+    // Restaurer l'état initial
+    if (particles) {
+        particles.rotation.set(0, 0, 0);
+        if (borderParticles) {
+            borderParticles.rotation.set(0, 0, 0);
+        }
+    }
+    
+    console.log('Préchauffage terminé');
 }
 
 // Création des particules
@@ -556,15 +758,10 @@ function createParticles() {
     geometry.setAttribute('radialOffset', new THREE.BufferAttribute(radialOffsets, 1));
 
     // Ajouter après la création des attributs de géométrie dans createParticles()
-    const particleOffsets = new Float32Array(config.particleCount * 3);
     const particlePhases = new Float32Array(config.particleCount);
     for (let i = 0; i < config.particleCount; i++) {
         particlePhases[i] = Math.random() * Math.PI * 2;
-        particleOffsets[i * 3] = (Math.random() - 0.5) * 0.02;     // X offset
-        particleOffsets[i * 3 + 1] = (Math.random() - 0.5) * 0.02; // Y offset
-        particleOffsets[i * 3 + 2] = (Math.random() - 0.5) * 0.02; // Z offset
     }
-    geometry.setAttribute('offset', new THREE.BufferAttribute(particleOffsets, 3));
     geometry.setAttribute('phase', new THREE.BufferAttribute(particlePhases, 1));
 
     const material = new THREE.ShaderMaterial({
@@ -718,15 +915,10 @@ function createParticles() {
     borderGeometry.setAttribute('finalPosition', new THREE.BufferAttribute(borderFinalPositions, 3));
 
     // Ajouter les mêmes attributs pour les particules de bordure
-    const borderParticleOffsets = new Float32Array(config.borderParticleCount * 3);
     const borderParticlePhases = new Float32Array(config.borderParticleCount);
     for (let i = 0; i < config.borderParticleCount; i++) {
         borderParticlePhases[i] = Math.random() * Math.PI * 2;
-        borderParticleOffsets[i * 3] = (Math.random() - 0.5) * 0.02;
-        borderParticleOffsets[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
-        borderParticleOffsets[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
     }
-    borderGeometry.setAttribute('offset', new THREE.BufferAttribute(borderParticleOffsets, 3));
     borderGeometry.setAttribute('phase', new THREE.BufferAttribute(borderParticlePhases, 1));
 
     const borderMaterial = new THREE.ShaderMaterial({

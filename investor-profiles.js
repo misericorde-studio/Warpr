@@ -63,6 +63,7 @@ let currentZoom = 2.10;
 let targetZoom = 2.10;
 let currentFar = 2.2;
 let targetFar = 2.2;
+let progressBar, progressValue;
 
 // Tableaux de positions
 let mainInitialPositions;
@@ -75,7 +76,6 @@ let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
 let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
 
 // Ajouter ces variables au début du fichier
-let progressBar, progressValue;
 let planeMesh;
 
 // Pré-allocation des vecteurs et matrices pour éviter les allocations pendant l'animation
@@ -325,6 +325,13 @@ function initializeParticleCache() {
     particleCache.offsets = new Float32Array(totalParticles * 3);
 }
 
+function updateProgressIndicator(scrollProgress) {
+    if (progressBar && progressValue) {
+        progressBar.style.setProperty('--progress', `${scrollProgress}%`);
+        progressValue.textContent = `[ ${Math.round(scrollProgress)}% ]`;
+    }
+}
+
 // Animation optimisée
 function animate(timestamp) {
     requestAnimationFrame(animate);
@@ -344,6 +351,9 @@ function animate(timestamp) {
     // Calcul du scroll progress une seule fois
     const scrollProgress = calculateScrollProgress();
     
+    // Mise à jour de l'indicateur de progression
+    updateProgressIndicator(scrollProgress);
+
     // Animation des rotations avec Lenis
     if (particles) {
         // Calcul des rotations cibles
@@ -511,8 +521,17 @@ function updateBorderParticlesOptimized(timestamp, scrollProgress) {
             const dirX = dx / dist;
             const dirZ = dz / dist;
 
-            // Appliquer l'épaisseur radiale
-            const radialOffset = currentRadial * 0.1;
+            // Distribution radiale plus équilibrée avec amplitude réduite vers l'extérieur
+            const radialDirection = ((i % 3) - 1); // Donne -1, 0, ou 1
+            let radialOffset;
+            if (radialDirection > 0) {
+                // Pour les particules allant vers l'extérieur (radialDirection = 1)
+                radialOffset = currentRadial * 0.05 * radialDirection;
+            } else {
+                // Pour les particules allant vers l'intérieur (radialDirection = -1) ou restant sur place (radialDirection = 0)
+                radialOffset = currentRadial * 0.08 * radialDirection;
+            }
+
             baseX = deployedX + dirX * radialOffset;
             baseZ = deployedZ + dirZ * radialOffset;
 

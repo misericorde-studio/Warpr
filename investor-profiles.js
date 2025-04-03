@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     radius: 1.5,
     particleCount: 1000,
-    particleSize: 10.0,
+    particleSize: 12.0,
     curveAmplitude: 0.22,
     curveFrequency: 9,
     curvePhases: 4,
@@ -18,14 +18,13 @@ const config = {
     particleGlowColor: 0x4FFFC1,
     cameraDistance: -3,
     initialZoom: 2.10,
-    finalZoom: 0.8,  // Modifié de 1.50 à 1.10
+    finalZoom: 0.8,
     cameraNear: 1,
     cameraFar: 2.2,
     initialFar: 2.2,
     finalFar: 4.5,
     clipPlaneHeight: 0.5,
     clipPlanePosition: 0.0,
-    // Configuration de la bordure
     borderWidth: 0.4,
     borderParticleCount: 2000,
     borderParticleSize: 6.80,
@@ -33,7 +32,6 @@ const config = {
     borderParticleMinSize: 6.80,
     borderColor: 0xFFFFFF,
     thicknessVariationMultiplier: 5.0,
-    // Configuration du rectangle vert
     greenLine: {
         width: 0.58,
         height: 0.02
@@ -64,6 +62,11 @@ let targetZoom = 2.10;
 let currentFar = 2.2;
 let targetFar = 2.2;
 let progressBar, progressValue;
+let targetLineWidth = 1;
+let currentLineWidth = 1;
+let targetLineOpacity = 1;
+let currentLineOpacity = 1;
+let planeMesh;
 
 // Tableaux de positions
 let mainInitialPositions;
@@ -74,9 +77,6 @@ let positions;
 let phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
 let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
 let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
-
-// Ajouter ces variables au début du fichier
-let planeMesh;
 
 // Pré-allocation des vecteurs et matrices pour éviter les allocations pendant l'animation
 const tempVector = new THREE.Vector3();
@@ -187,7 +187,7 @@ function init() {
     camera.zoom = config.initialZoom;
     camera.updateProjectionMatrix();
 
-    // Renderer avec optimisations spécifiques pour Chrome
+    // Renderer avec optimisations
     renderer = new THREE.WebGLRenderer({
         antialias: true,
         alpha: false,
@@ -200,19 +200,33 @@ function init() {
         logarithmicDepthBuffer: false
     });
     
-    // Optimisations du renderer
     renderer.setSize(container.clientWidth, container.clientHeight, false);
-    renderer.setPixelRatio(1); // Force un pixel ratio de 1 pour de meilleures performances
+    renderer.setPixelRatio(1);
     renderer.setClearColor(0x0B0E13, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    
-    // Désactive les fonctionnalités non utilisées
     renderer.shadowMap.enabled = false;
     renderer.physicallyCorrectLights = false;
-    
     renderer.info.autoReset = false;
     
     container.appendChild(renderer.domElement);
+
+    // Création des particules
+    createParticles();
+    
+    // Mettre à jour la taille des particules
+    updateParticles();
+    
+    // Mettre à jour l'échelle initiale des particules
+    if (particles && particles.material.uniforms) {
+        particles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+    }
+    if (borderParticles && borderParticles.material.uniforms) {
+        borderParticles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+    }
+
+    // Cache les éléments de progression
+    progressBar = document.querySelector('.loading-progress-bar');
+    progressValue = document.querySelector('.loading-progress-value');
 
     // Initialiser l'IntersectionObserver pour le préchauffage
     prewarmObserver = new IntersectionObserver((entries) => {
@@ -232,24 +246,6 @@ function init() {
 
     // Horloge
     clock = new THREE.Clock();
-
-    // Cache les éléments de progression
-    progressBar = document.querySelector('.loading-progress-bar');
-    progressValue = document.querySelector('.loading-progress-value');
-
-    // Création des particules
-    createParticles();
-    
-    // Mettre à jour l'échelle initiale des particules
-    if (particles && particles.material.uniforms) {
-        particles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
-    }
-    if (borderParticles && borderParticles.material.uniforms) {
-        borderParticles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
-    }
-
-    // Mise en cache des éléments DOM
-    cacheElements();
 
     // Événements
     window.addEventListener('resize', throttle(onWindowResize, 100), false);
@@ -446,6 +442,83 @@ function animate(timestamp) {
     // Mise à jour des particules de bordure
     if (borderParticles && borderParticles.geometry) {
         updateBorderParticlesOptimized(timestamp, scrollProgress);
+    }
+
+    // Animation du plan en fonction du scroll
+    if (scrollProgress <= 32) {
+        // De 0 à 32% : maintient 50% de hauteur
+        config.clipPlaneHeight = 0.5;
+        config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
+        
+    } else if (scrollProgress <= 40) {
+        // De 32% à 40% : réduction à 40% de hauteur
+        const progress = (scrollProgress - 32) / 8;
+        config.clipPlaneHeight = 0.5 - (progress * 0.1); // De 50% à 40%
+        config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
+        
+    } else if (scrollProgress <= 46) {
+        // De 40% à 46% : maintient 40% de hauteur
+        config.clipPlaneHeight = 0.4;
+        config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
+        
+    } else if (scrollProgress <= 51) {
+        // De 46% à 51% : fade out de la ligne
+        const fadeProgress = (scrollProgress - 46) / 5;
+        targetLineOpacity = Math.max(0, 1 - fadeProgress);
+        config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
+        config.clipPlanePosition = 0.5 - (fadeProgress * 0.5); // Descend au centre
+        
+    } else {
+        // Au-delà de 51% : maintient 100% et ligne invisible
+        config.clipPlaneHeight = 1.0;
+        config.clipPlanePosition = 0.0;
+        targetLineOpacity = 0;
+    }
+
+    // Mettre à jour les uniforms du plan
+    updateClipPlane();
+
+    if (planeMesh) {
+        // Calcul de la position du plan dans l'espace NDC (-1 à 1)
+        const planeBottom = config.clipPlanePosition - config.clipPlaneHeight;
+        
+        // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
+        const worldY = planeBottom * 2;
+        
+        // Interpolation de la position Y avec Lenis
+        if (window.lenis) {
+            const lerpFactor = window.lenis.options.lerp;
+            planeMesh.position.y += (worldY - planeMesh.position.y) * lerpFactor;
+            currentLineOpacity += (targetLineOpacity - currentLineOpacity) * lerpFactor;
+        } else {
+            planeMesh.position.y = worldY;
+            currentLineOpacity = targetLineOpacity;
+        }
+        
+        // Mettre à jour la position dans le shader des particules
+        if (particles && particles.material && particles.material.uniforms && particles.material.uniforms.linePosition) {
+            particles.material.uniforms.linePosition.value = planeMesh.position.y;
+        }
+        
+        // Ajuste l'échelle du plan en fonction du zoom de la caméra
+        const scaleCompensation = config.initialZoom / camera.zoom;
+        const frustumSize = (camera.top - camera.bottom);
+        const aspect = container.clientWidth / container.clientHeight;
+        const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+        
+        // Appliquer l'échelle
+        planeMesh.scale.set(
+            targetWidth * scaleCompensation,
+            1,
+            1
+        );
+        
+        // Appliquer l'opacité interpolée au matériau
+        planeMesh.material.opacity = currentLineOpacity;
+        planeMesh.visible = currentLineOpacity > 0.001;
     }
 
     // Rendu optimisé
@@ -890,7 +963,7 @@ function createParticles() {
     const material = new THREE.ShaderMaterial({
         uniforms: {
             pointSize: { value: config.particleSize },
-            scaleFactor: { value: 1.0 },
+            scaleFactor: { value: container ? container.clientWidth / 1920 : 1.0 },
             clipPlaneHeight: { value: config.clipPlaneHeight },
             clipPlanePosition: { value: config.clipPlanePosition },
             time: { value: 0.0 }
@@ -1167,12 +1240,13 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     
     // Mettre à jour l'échelle des particules
+    const scaleFactor = container.clientWidth / baseWidth;
     if (particles && particles.material.uniforms) {
-        particles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+        particles.material.uniforms.scaleFactor.value = scaleFactor;
         particles.material.uniforms.pointSize.value = config.particleSize;
     }
     if (borderParticles && borderParticles.material.uniforms) {
-        borderParticles.material.uniforms.scaleFactor.value = container.clientWidth / baseWidth;
+        borderParticles.material.uniforms.scaleFactor.value = scaleFactor;
         borderParticles.material.uniforms.pointSize.value = config.borderParticleSize;
     }
     
@@ -1245,169 +1319,69 @@ function updateScroll() {
     }
 
     // Calcul de la progression
-    const totalHeight = airdropRect.height - windowHeight; // Distance totale de scroll originale
-    const currentScroll = -airdropRect.top; // Position actuelle du scroll
-    const scrollAtStart = -startPoint; // Position du scroll quand la section est à 60% du viewport
+    const totalHeight = airdropRect.height - windowHeight;
+    const currentScroll = -airdropRect.top;
+    const scrollAtStart = -startPoint;
     
-    // Calcul de la progression ajustée
-    const adjustedScroll = currentScroll - scrollAtStart; // Distance scrollée depuis le nouveau point de départ
-    const adjustedTotal = totalHeight - scrollAtStart; // Distance totale ajustée
+    const adjustedScroll = currentScroll - scrollAtStart;
+    const adjustedTotal = totalHeight - scrollAtStart;
     const scrollProgress = Math.min(100, Math.max(0, (adjustedScroll / adjustedTotal) * 100));
-    
-    const animationProgress = Math.min(90, scrollProgress);
-    const scrollingUp = currentScrolled < lastScrollY;
-    lastScrollY = currentScrolled;
+
+    // Animation des rotations
+    if (particles) {
+        // Rotation Y
+        const rotationY = -(scrollProgress / 100) * (180 * Math.PI / 180);
+        particles.rotation.y = rotationY;
+
+        // Rotation X (60% à 84%)
+        if (scrollProgress > 60) {
+            const rotationProgress = Math.min(1, (scrollProgress - 60) / 24);
+            particles.rotation.x = -(rotationProgress) * (90 * Math.PI / 180);
+        } else {
+            particles.rotation.x = 0;
+        }
+
+        if (borderParticles) {
+            borderParticles.rotation.copy(particles.rotation);
+        }
+    }
 
     // Animation du plan en fonction du scroll
     if (scrollProgress <= 32) {
         // De 0 à 32% : maintient 50% de hauteur
         config.clipPlaneHeight = 0.5;
         config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
         
     } else if (scrollProgress <= 40) {
         // De 32% à 40% : réduction à 40% de hauteur
         const progress = (scrollProgress - 32) / 8;
         config.clipPlaneHeight = 0.5 - (progress * 0.1); // De 50% à 40%
         config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
         
     } else if (scrollProgress <= 46) {
         // De 40% à 46% : maintient 40% de hauteur
         config.clipPlaneHeight = 0.4;
         config.clipPlanePosition = 0.5;
+        targetLineOpacity = 1;
         
-    } else if (scrollProgress <= 52) {
-        // De 46% à 52% : extension à 100% de hauteur
-        const progress = (scrollProgress - 46) / 6;
-        config.clipPlaneHeight = 0.4 + (progress * 0.6); // De 40% à 100%
-        config.clipPlanePosition = 0.5 - (progress * 0.5); // Descend au centre
+    } else if (scrollProgress <= 51) {
+        // De 46% à 51% : fade out de la ligne
+        const fadeProgress = (scrollProgress - 46) / 5;
+        targetLineOpacity = Math.max(0, 1 - fadeProgress);
+        config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
+        config.clipPlanePosition = 0.5 - (fadeProgress * 0.5); // Descend au centre
         
     } else {
-        // Au-delà de 52% : maintient 100%
+        // Au-delà de 51% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
         config.clipPlanePosition = 0.0;
+        targetLineOpacity = 0;
     }
 
     // Mettre à jour les uniforms du plan
     updateClipPlane();
-
-    // Animation des rotations et positions seulement si nous sommes en train de défiler
-    if (particles) {
-        // Rotation Y continue de 0° à -180° sur toute la durée du scroll (jusqu'à 100%)
-        const rotationY = -(scrollProgress / 100) * (180 * Math.PI / 180);
-        particles.rotation.y = rotationY;
-
-        // Rotation X de 0° à -90° entre 60% et 90% de scroll (sens inverse)
-        if (scrollProgress > 60) {
-            const rotationX = -((scrollProgress - 60) / 30) * (90 * Math.PI / 180);
-            particles.rotation.x = rotationX;
-        } else {
-            particles.rotation.x = 0;
-        }
-
-        // Appliquer les rotations à la bordure
-        if (borderParticles) {
-            borderParticles.rotation.copy(particles.rotation);
-        }
-
-        // Gestion du zoom
-        if (scrollProgress < 60) {
-            targetZoom = config.initialZoom;
-        } else if (scrollProgress >= 60 && scrollProgress <= 84) {
-            const zoomProgress = Math.min(1, (scrollProgress - 60) / 24);
-            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
-        } else {
-            targetZoom = config.finalZoom;
-        }
-
-        // Gestion de la distance maximale de la caméra (séparée du zoom)
-        if (scrollProgress < 48) {
-            targetFar = config.initialFar;
-        } else if (scrollProgress >= 48 && scrollProgress <= 60) {
-            const farProgress = Math.min(1, (scrollProgress - 48) / 12);
-            targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
-        } else {
-            targetFar = config.finalFar;
-        }
-
-        // Interpolation douce avec Lenis
-        if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp * 1.5;
-            
-            // Interpolation du zoom avec limitation de la variation
-            const zoomDelta = (targetZoom - currentZoom) * lerpFactor;
-            currentZoom += Math.abs(zoomDelta) > 0.0001 ? zoomDelta : (targetZoom - currentZoom);
-            camera.zoom = currentZoom;
-            
-            // Interpolation de la distance far avec limitation de la variation
-            const farDelta = (targetFar - currentFar) * lerpFactor;
-            currentFar += Math.abs(farDelta) > 0.0001 ? farDelta : (targetFar - currentFar);
-            camera.far = currentFar;
-            camera.near = Math.max(0.1, currentFar * 0.1);
-            
-            camera.updateProjectionMatrix();
-
-            // Ajuster l'échelle du rectangle pour le zoom courant
-            if (planeMesh) {
-                const scaleCompensation = config.initialZoom / currentZoom;
-                const frustumSize = (camera.top - camera.bottom);
-                const aspect = container.clientWidth / container.clientHeight;
-                const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
-                
-                planeMesh.scale.set(
-                    targetWidth * scaleCompensation,
-                    1,
-                    1
-                );
-            }
-        }
-    }
-
-    if (planeMesh) {
-        // Calcul de la position du plan dans l'espace NDC (-1 à 1)
-        const planeBottom = config.clipPlanePosition - config.clipPlaneHeight;
-        
-        // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
-        const worldY = planeBottom * 2;
-        planeMesh.position.y = worldY;
-        
-        // Mettre à jour la position dans le shader des particules
-        if (particles && particles.material && particles.material.uniforms && particles.material.uniforms.linePosition) {
-            particles.material.uniforms.linePosition.value = worldY;
-        }
-        
-        // Ajuste l'échelle du plan en fonction du zoom de la caméra
-        const scaleCompensation = config.initialZoom / camera.zoom;
-        
-        // Calcul de la largeur et de l'opacité en fonction de la progression
-        let widthScale = 1;
-        let opacity = 1;
-        
-        // Disparition progressive de la ligne entre 48% et 50%
-        if (scrollProgress >= 48.0 && scrollProgress <= 50.0) {
-            const fadeProgress = (scrollProgress - 48.0) / 2.0;
-            widthScale = Math.max(0, 1 - fadeProgress);
-            opacity = Math.max(0, 1 - fadeProgress);
-        } else if (scrollProgress > 50.0) {
-            widthScale = 0;
-            opacity = 0;
-        }
-        
-        // Calcul de la largeur avec le facteur de largeur personnalisé
-        const frustumSize = (camera.top - camera.bottom);
-        const aspect = container.clientWidth / container.clientHeight;
-        const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
-        
-        // Appliquer l'échelle
-        planeMesh.scale.set(
-            targetWidth * scaleCompensation * widthScale,
-            1,
-            1
-        );
-        
-        // Appliquer l'opacité au matériau
-        planeMesh.material.opacity = opacity;
-        planeMesh.visible = opacity > 0;
-    }
 }
 
 // Fonction pour mettre à jour les particules

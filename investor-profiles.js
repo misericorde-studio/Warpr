@@ -208,7 +208,8 @@ function animate(timestamp) {
     if (window.lenis) {
         window.lenis.raf(timestamp);
     }
-    
+    // synchroniser lenis et three
+    renderer.render(scene, camera);
     // Mise à jour de la barre de progression avec le pourcentage de la section airdrop
     let scrollProgress = 0;
     if (progressBar && progressValue) {

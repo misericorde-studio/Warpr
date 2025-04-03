@@ -350,14 +350,14 @@ function animate(timestamp) {
     // Mise à jour de l'indicateur de progression
     updateProgressIndicator(scrollProgress);
 
-    // Animation des rotations avec Lenis
+    // Animation des rotations
     if (particles) {
-        // Calcul des rotations cibles
+        // Rotation Y
         const normalizedProgress = scrollProgress / 100;
         targetRotationY = -(normalizedProgress) * (180 * Math.PI / 180);
         
         if (scrollProgress > 60) {
-            const rotationProgress = (scrollProgress - 60) / 30;
+            const rotationProgress = (scrollProgress - 60) / 21;
             targetRotationX = -(Math.min(1, rotationProgress)) * (90 * Math.PI / 180);
         } else {
             targetRotationX = 0;
@@ -384,8 +384,8 @@ function animate(timestamp) {
         // Gestion du zoom
         if (scrollProgress < 60) {
             targetZoom = config.initialZoom;
-        } else if (scrollProgress >= 60 && scrollProgress <= 84) {
-            const zoomProgress = Math.min(1, (scrollProgress - 60) / 24);
+        } else if (scrollProgress >= 60 && scrollProgress <= 81) {
+            const zoomProgress = Math.min(1, (scrollProgress - 60) / 21);
             targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
         } else {
             targetZoom = config.finalZoom;
@@ -729,7 +729,7 @@ function calculateScrollProgress() {
     const airdropSection = document.querySelector('.airdrop');
     const airdropRect = airdropSection.getBoundingClientRect();
     const windowHeight = window.innerHeight;
-    const startPoint = windowHeight * 0.6;
+    const startPoint = windowHeight * 0.9;
     const sectionTop = airdropRect.top;
     
     if (sectionTop > startPoint || airdropRect.bottom <= 0) {

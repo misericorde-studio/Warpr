@@ -76,7 +76,7 @@ let positions;
 // Tableaux de phases
 let phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
 let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
-let amplitudeMultipliers = [1, 0.8, 0.6, 0.4];
+let amplitudeMultipliers = [1.8, 0.9, 0.01, 0.002];
 
 // Pré-allocation des vecteurs et matrices pour éviter les allocations pendant l'animation
 const tempVector = new THREE.Vector3();
@@ -856,8 +856,19 @@ function createParticles() {
         // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
+            const amp = heightVariation * amplitudeMultipliers[phase];
+            
+            // Création d'une asymétrie dans la forme de la courbe
+            const baseAngle = finalAngle * freq + phaseOffsets[phase];
+            let value = Math.sin(baseAngle);
+            
+            // Ajout d'une distorsion asymétrique
+            if (value > 0) {
+                value = Math.pow(value, 1.5); // Montée plus rapide
+            } else {
+                value = -Math.pow(-value, 0.7); // Descente plus lente
+            }
+            
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
                 value = value * (1 - blend) + startValues[phase] * blend;
@@ -913,8 +924,19 @@ function createParticles() {
         // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
-            let value = Math.sin(finalAngle * freq + phaseOffsets[phase]);
+            const amp = heightVariation * amplitudeMultipliers[phase];
+            
+            // Création d'une asymétrie dans la forme de la courbe
+            const baseAngle = finalAngle * freq + phaseOffsets[phase];
+            let value = Math.sin(baseAngle);
+            
+            // Ajout d'une distorsion asymétrique
+            if (value > 0) {
+                value = Math.pow(value, 1.5); // Montée plus rapide
+            } else {
+                value = -Math.pow(-value, 0.7); // Descente plus lente
+            }
+            
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
                 value = value * (1 - blend) + startValues[phase] * blend;
@@ -1066,7 +1088,7 @@ function createParticles() {
         let baseY = 0;
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase] / Math.sqrt(phase + 1);
+            const amp = heightVariation * amplitudeMultipliers[phase];
             
             let value = Math.sin(angle * freq + phaseOffsets[phase]);
             

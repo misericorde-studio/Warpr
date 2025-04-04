@@ -44,17 +44,17 @@
         }
 
         h2 {
-            font-size: 1.5em;
+            font-size: clamp(1rem, 1.5em, 3.5rem);
             line-height: 1;
         }
 
         .pill {
-            font-size: 0.625em;
+            font-size: clamp(0.625rem, 0.625em, 2rem);
             margin-bottom: .5rem;
         }
 
         p {
-            font-size: 0.75em;
+            font-size: clamp(0.75rem, 0.75em, 1.75rem);
             line-height: 1.28;
             font-family: 'MonumentGroteskMono-Light', Arial, sans-serif;
         }
@@ -158,7 +158,7 @@
         }
 
         .indicator-name{
-            font-size: 0.625em;
+            font-size: clamp(0.625rem, 0.625em, 2rem);
             text-transform: uppercase;
             line-height: 1;
         }
@@ -199,10 +199,10 @@
             display: flex;
             flex-direction: column;
             /* justify-content: flex-start; */
-            justify-content: space-between;
+            justify-content: center;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             padding: 1.5rem 1.5rem 2.5rem 1.5rem;
-            /* gap: 16rem; */
+            gap: 2rem;
 
             position: relative;
             z-index: 1;
@@ -249,7 +249,7 @@
             justify-content: space-between;
             align-items: center;
             font-family: 'MonumentGroteskMono-Regular', monospace;
-            font-size: 0.625em;
+            font-size: clamp(0.625rem, 0.625em, 2rem);
             text-transform: uppercase;
             border-top: 1px solid rgba(255, 255, 255, 0.2);
             background-color: #0B0E13;
@@ -455,7 +455,7 @@
         .scroll-section p {
             color: rgba(255, 255, 255, 0.3);
             text-transform: uppercase;
-            font-size: 1em;
+            font-size: clamp(1rem, 1em, 2rem);
             letter-spacing: 0.1em;
         }
     </style>

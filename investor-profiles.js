@@ -805,14 +805,14 @@ function createParticles() {
     const colors = new Float32Array(config.particleCount * 3);
     const mainInitialPositions = new Float32Array(config.particleCount * 3);
     const mainFinalPositions = new Float32Array(config.particleCount * 3);
-    const radialOffsets = new Float32Array(config.particleCount); // Nouvel attribut pour les offsets radiaux
+    const radialOffsets = new Float32Array(config.particleCount);
 
     // Valeurs fixes pour la continuité
     const startValues = new Float32Array(config.curvePhases);
     const endValues = new Float32Array(config.curvePhases);
     for (let phase = 0; phase < config.curvePhases; phase++) {
-        startValues[phase] = Math.sin(0 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]);
-        endValues[phase] = Math.sin(Math.PI * 2 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]);
+        startValues[phase] = Math.sin(0 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]) || 0;
+        endValues[phase] = Math.sin(Math.PI * 2 * config.curveFrequency * frequencyMultipliers[phase] + phaseOffsets[phase]) || 0;
     }
 
     // Trouver la hauteur maximale et minimale
@@ -830,14 +830,14 @@ function createParticles() {
         const finalAngle = angle + angleVariation;
         
         // Distribution radiale plus régulière avec variation minimale
-        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
-        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
+        const randomFactor = Math.max(0.8, Math.min(1.2, 0.8 + Math.random() * 0.4));
+        const layerOffset = Math.max(-0.04, Math.min(0.04, (randomFactor - 1) * 0.04));
         
         // État initial : toutes les particules presque sur le cercle de base
-        const initialRadius = config.radius * (1 + layerOffset * 0.2);
+        const initialRadius = Math.max(0.1, config.radius * (1 + layerOffset * 0.2));
         
         // État final : variation radiale légèrement plus prononcée
-        const finalRadius = config.radius * (1 + layerOffset);
+        const finalRadius = Math.max(0.1, config.radius * (1 + layerOffset));
 
         // Positions initiales (quasi-régulières sur le cercle)
         const initialX = Math.cos(finalAngle) * initialRadius;
@@ -848,49 +848,32 @@ function createParticles() {
         const finalZ = Math.sin(finalAngle) * finalRadius;
 
         // Calcul de la hauteur Y avec distribution contrôlée
-        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
-        const baseThickness = lineThickness * (1 + thicknessVariation);
+        const thicknessVariation = Math.max(0, Math.min(1, (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6)));
+        const baseThickness = Math.max(0.001, lineThickness * (1 + thicknessVariation));
         const randomY = (Math.random() * 2 - 1) * baseThickness;
         let y = randomY;
         
         // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
-            const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase];
+            const freq = config.curveFrequency * (frequencyMultipliers[phase] || 1);
+            const amp = heightVariation * (amplitudeMultipliers[phase] || 1);
             
-            // Création d'une courbe plus douce avec interpolation cubique
-            const baseAngle = finalAngle * freq + phaseOffsets[phase];
-            let value = Math.sin(baseAngle);
-            
-            // Fonction d'adoucissement cubique avec variation
-            const smoothStep = (x, p) => {
-                // Ajoute une variation dans la courbe d'interpolation
-                return x * x * (3 - 2 * Math.pow(x, p));
-            };
-            
-            // Application de l'adoucissement avec forte asymétrie
-            if (value > 0) {
-                const t = value * 0.5 + 0.5;
-                // Montée plus abrupte avec variation
-                value = smoothStep(t, 0.7) * 2 - 1;
-                value = Math.pow(value, 2.2) * (0.8 + Math.cos(baseAngle * 0.5) * 0.2);
-            } else {
-                const t = -value * 0.5 + 0.5;
-                // Descente plus progressive avec variation
-                value = -(smoothStep(t, 1.3) * 2 - 1);
-                value = -Math.pow(-value, 0.35) * (0.9 + Math.sin(baseAngle * 0.7) * 0.1);
-            }
+            let value = Math.sin(finalAngle * freq + (phaseOffsets[phase] || 0)) || 0;
             
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
-                value = value * (1 - blend) + startValues[phase] * blend;
+                value = value * (1 - blend) + (startValues[phase] || 0) * blend;
             }
-            y += value * amp;
+            
+            y += (value * amp) || 0;
         }
 
         // Ajout du bruit avec une influence réduite
-        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
-        y += noiseValue * heightVariation;
+        const noiseValue = (noise1D(finalAngle * config.noiseScale) || 0) * 0.2 + (Math.random() - 0.5) * 0.1;
+        y += (noiseValue * heightVariation) || 0;
+
+        // S'assurer que y est un nombre valide
+        y = Math.max(-10, Math.min(10, y || 0));
 
         maxY = Math.max(maxY, y);
         minY = Math.min(minY, y);
@@ -910,14 +893,14 @@ function createParticles() {
         const finalAngle = angle + angleVariation;
         
         // Distribution radiale plus régulière avec variation minimale
-        const randomFactor = 0.8 + Math.random() * 0.4; // Entre 0.8 et 1.2
-        const layerOffset = (randomFactor - 1) * 0.04; // Variation réduite
+        const randomFactor = Math.max(0.8, Math.min(1.2, 0.8 + Math.random() * 0.4));
+        const layerOffset = Math.max(-0.04, Math.min(0.04, (randomFactor - 1) * 0.04));
         
         // État initial : toutes les particules presque sur le cercle de base
-        const initialRadius = config.radius * (1 + layerOffset * 0.2);
+        const initialRadius = Math.max(0.1, config.radius * (1 + layerOffset * 0.2));
         
         // État final : variation radiale légèrement plus prononcée
-        const finalRadius = config.radius * (1 + layerOffset);
+        const finalRadius = Math.max(0.1, config.radius * (1 + layerOffset));
 
         // Positions initiales (quasi-régulières sur le cercle)
         const initialX = Math.cos(finalAngle) * initialRadius;
@@ -928,49 +911,32 @@ function createParticles() {
         const finalZ = Math.sin(finalAngle) * finalRadius;
 
         // Calcul de la hauteur Y avec distribution contrôlée
-        const thicknessVariation = (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6);
-        const baseThickness = lineThickness * (1 + thicknessVariation);
+        const thicknessVariation = Math.max(0, Math.min(1, (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6)));
+        const baseThickness = Math.max(0.001, lineThickness * (1 + thicknessVariation));
         const randomY = (Math.random() * 2 - 1) * baseThickness;
         let y = randomY;
         
         // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
-            const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase];
+            const freq = config.curveFrequency * (frequencyMultipliers[phase] || 1);
+            const amp = heightVariation * (amplitudeMultipliers[phase] || 1);
             
-            // Création d'une courbe plus douce avec interpolation cubique
-            const baseAngle = finalAngle * freq + phaseOffsets[phase];
-            let value = Math.sin(baseAngle);
-            
-            // Fonction d'adoucissement cubique avec variation
-            const smoothStep = (x, p) => {
-                // Ajoute une variation dans la courbe d'interpolation
-                return x * x * (3 - 2 * Math.pow(x, p));
-            };
-            
-            // Application de l'adoucissement avec forte asymétrie
-            if (value > 0) {
-                const t = value * 0.5 + 0.5;
-                // Montée plus abrupte avec variation
-                value = smoothStep(t, 0.7) * 2 - 1;
-                value = Math.pow(value, 2.2) * (0.8 + Math.cos(baseAngle * 0.5) * 0.2);
-            } else {
-                const t = -value * 0.5 + 0.5;
-                // Descente plus progressive avec variation
-                value = -(smoothStep(t, 1.3) * 2 - 1);
-                value = -Math.pow(-value, 0.35) * (0.9 + Math.sin(baseAngle * 0.7) * 0.1);
-            }
+            let value = Math.sin(finalAngle * freq + (phaseOffsets[phase] || 0)) || 0;
             
             if (progress > 0.95) {
                 const blend = (progress - 0.95) / 0.05;
-                value = value * (1 - blend) + startValues[phase] * blend;
+                value = value * (1 - blend) + (startValues[phase] || 0) * blend;
             }
-            y += value * amp;
+            
+            y += (value * amp) || 0;
         }
 
         // Ajout du bruit avec une influence réduite
-        const noiseValue = noise1D(finalAngle * config.noiseScale) * 0.2 + (Math.random() - 0.5) * 0.1;
-        y += noiseValue * heightVariation;
+        const noiseValue = (noise1D(finalAngle * config.noiseScale) || 0) * 0.2 + (Math.random() - 0.5) * 0.1;
+        y += (noiseValue * heightVariation) || 0;
+
+        // S'assurer que y est un nombre valide
+        y = Math.max(-10, Math.min(10, y || 0));
 
         // Définir la couleur en fonction de la hauteur normalisée
         const normalizedHeight = (y - minY) / (maxY - minY);
@@ -1028,23 +994,47 @@ function createParticles() {
             uniform float clipPlanePosition;
             uniform float time;
             
-            attribute vec3 offset;
             attribute float phase;
             
             varying vec4 vClipPos;
             varying float vY;
             
+            // Fonction pour s'assurer qu'une valeur n'est pas NaN
+            float safeValue(float value) {
+                return isnan(value) ? 0.0 : value;
+            }
+            
             void main() {
-                // Calculer le mouvement de flottement
-                float floatAmplitude = 0.015;
-                vec3 floatOffset = vec3(
-                    sin(time * 0.5 + phase) * offset.x,
-                    cos(time * 0.4 + phase) * offset.y,
-                    sin(time * 0.6 + phase) * offset.z
-                ) * floatAmplitude;
+                // Position de base sécurisée
+                vec3 basePosition = vec3(
+                    safeValue(position.x),
+                    safeValue(position.y),
+                    safeValue(position.z)
+                );
                 
-                // Appliquer le mouvement à la position
-                vec3 finalPosition = position + floatOffset;
+                // Calcul sécurisé du flottement
+                float safePhase = safeValue(phase);
+                float safeTime = safeValue(time);
+                
+                // Limiter les amplitudes pour éviter les valeurs extrêmes
+                float offsetX = sin(safeTime * 0.5 + safePhase) * 0.015;
+                float offsetY = cos(safeTime * 0.4 + safePhase) * 0.015;
+                float offsetZ = sin(safeTime * 0.6 + safePhase) * 0.015;
+                
+                // Appliquer les offsets de manière sécurisée
+                vec3 finalPosition = basePosition + vec3(
+                    clamp(offsetX, -0.015, 0.015),
+                    clamp(offsetY, -0.015, 0.015),
+                    clamp(offsetZ, -0.015, 0.015)
+                );
+                
+                // S'assurer que la position finale est valide
+                finalPosition = vec3(
+                    safeValue(finalPosition.x),
+                    safeValue(finalPosition.y),
+                    safeValue(finalPosition.z)
+                );
+                
                 vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;
@@ -1189,23 +1179,47 @@ function createParticles() {
             uniform float clipPlanePosition;
             uniform float time;
             
-            attribute vec3 offset;
             attribute float phase;
             
             varying vec4 vClipPos;
             varying float vY;
             
+            // Fonction pour s'assurer qu'une valeur n'est pas NaN
+            float safeValue(float value) {
+                return isnan(value) ? 0.0 : value;
+            }
+            
             void main() {
-                // Calculer le mouvement de flottement
-                float floatAmplitude = 0.015;
-                vec3 floatOffset = vec3(
-                    sin(time * 0.5 + phase) * offset.x,
-                    cos(time * 0.4 + phase) * offset.y,
-                    sin(time * 0.6 + phase) * offset.z
-                ) * floatAmplitude;
+                // Position de base sécurisée
+                vec3 basePosition = vec3(
+                    safeValue(position.x),
+                    safeValue(position.y),
+                    safeValue(position.z)
+                );
                 
-                // Appliquer le mouvement à la position
-                vec3 finalPosition = position + floatOffset;
+                // Calcul sécurisé du flottement
+                float safePhase = safeValue(phase);
+                float safeTime = safeValue(time);
+                
+                // Limiter les amplitudes pour éviter les valeurs extrêmes
+                float offsetX = sin(safeTime * 0.5 + safePhase) * 0.015;
+                float offsetY = cos(safeTime * 0.4 + safePhase) * 0.015;
+                float offsetZ = sin(safeTime * 0.6 + safePhase) * 0.015;
+                
+                // Appliquer les offsets de manière sécurisée
+                vec3 finalPosition = basePosition + vec3(
+                    clamp(offsetX, -0.015, 0.015),
+                    clamp(offsetY, -0.015, 0.015),
+                    clamp(offsetZ, -0.015, 0.015)
+                );
+                
+                // S'assurer que la position finale est valide
+                finalPosition = vec3(
+                    safeValue(finalPosition.x),
+                    safeValue(finalPosition.y),
+                    safeValue(finalPosition.z)
+                );
+                
                 vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
                 vClipPos = gl_Position;

@@ -6,7 +6,7 @@ const config = {
     radius: 1.5,
     particleCount: 1000,
     particleSize: 12.0,
-    curveAmplitude: 0.12,
+    curveAmplitude: 0.15,
     curveFrequency: 9,
     curvePhases: 4,
     noiseScale: 0.8,
@@ -931,9 +931,26 @@ function createParticles() {
             y += (value * amp) || 0;
         }
 
-        // Ajout du bruit avec une influence réduite
-        const noiseValue = (noise1D(finalAngle * config.noiseScale) || 0) * 0.2 + (Math.random() - 0.5) * 0.1;
-        y += (noiseValue * heightVariation) || 0;
+        // Distribution extrême pour certaines particules
+        const rand = Math.random();
+        if (rand < 0.3) { // 30% des particules vers le bas
+            y -= (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+        } else if (rand < 0.6) { // 30% des particules vers le haut
+            y += (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+        }
+
+        // Ajout d'une variation aléatoire standard pour toutes les particules
+        y += (Math.random() * 2 - 1) * heightVariation * 0.6; // Réduit de 0.8 à 0.6
+
+        // Ajout du bruit avec variation ajustée
+        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3; // Réduit de 0.35 à 0.3
+        y += noiseValue * (heightVariation * 1.2); // Réduit de 1.5 à 1.2
+
+        // Distribution secondaire pour plus de variété
+        if (Math.random() < 0.4) { // 40% des particules
+            const direction = Math.random() < 0.5 ? 1 : -1;
+            y += direction * Math.random() * heightVariation * 0.4; // Réduit de 0.6 à 0.4
+        }
 
         // S'assurer que y est un nombre valide
         y = Math.max(-10, Math.min(10, y || 0));
@@ -1102,7 +1119,7 @@ function createParticles() {
         let baseY = 0;
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
-            const amp = heightVariation * amplitudeMultipliers[phase];
+            const amp = heightVariation * amplitudeMultipliers[phase] * 1.2;
             
             let value = Math.sin(angle * freq + phaseOffsets[phase]);
             
@@ -1114,13 +1131,27 @@ function createParticles() {
             baseY += value * amp;
         }
 
-        // Ajout d'une variation aléatoire supplémentaire sur Y (réduite)
-        baseY += (Math.random() * 2 - 1) * heightVariation;
+        // Distribution extrême pour certaines particules
+        const rand = Math.random();
+        if (rand < 0.3) { // 30% des particules vers le bas
+            baseY -= (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+        } else if (rand < 0.6) { // 30% des particules vers le haut
+            baseY += (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+        }
 
-        // Ajout du bruit avec variation réduite
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3;
-        baseY += noiseValue * (heightVariation * 1.5);
-        
+        // Ajout d'une variation aléatoire standard pour toutes les particules
+        baseY += (Math.random() * 2 - 1) * heightVariation * 0.6; // Réduit de 0.8 à 0.6
+
+        // Ajout du bruit avec variation ajustée
+        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3; // Réduit de 0.35 à 0.3
+        baseY += noiseValue * (heightVariation * 1.2); // Réduit de 1.5 à 1.2
+
+        // Distribution secondaire pour plus de variété
+        if (Math.random() < 0.4) { // 40% des particules
+            const direction = Math.random() < 0.5 ? 1 : -1;
+            baseY += direction * Math.random() * heightVariation * 0.4; // Réduit de 0.6 à 0.4
+        }
+
         // Calcul de la position de base sur le cercle
         const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;
         const baseX = Math.cos(angle) * baseRadius;

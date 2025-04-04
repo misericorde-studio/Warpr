@@ -22,7 +22,7 @@ const config = {
     cameraNear: 1,
     cameraFar: 2.2,
     initialFar: 2.2,
-    finalFar: 4.5,
+    finalFar: 5.0,
     clipPlaneHeight: 0.5,
     clipPlanePosition: 0.0,
     borderWidth: 0.4,
@@ -399,10 +399,10 @@ function animate(timestamp) {
         }
 
         // Gestion de la distance maximale de la caméra (séparée du zoom)
-        if (scrollProgress < 48) {
+        if (scrollProgress < 25) {
             targetFar = config.initialFar;
-        } else if (scrollProgress >= 48 && scrollProgress <= 60) {
-            const farProgress = Math.min(1, (scrollProgress - 48) / 12);
+        } else if (scrollProgress >= 25 && scrollProgress <= 45) {
+            const farProgress = Math.min(1, (scrollProgress - 25) / 20);
             targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
         } else {
             targetFar = config.finalFar;

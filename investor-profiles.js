@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Configuration
 const config = {
     radius: 1.5,
-    particleCount: 1000,
+    particleCount: 800,
     particleSize: 12.0,
     curveAmplitude: 0.13,
     curveFrequency: 9,
@@ -1117,7 +1117,7 @@ function createParticles() {
 
         // Distribution radiale autour des particules principales
         const radialAngle = Math.random() * Math.PI * 2;
-        const radialOffset = Math.random() * config.borderWidth;
+        const radialOffset = Math.random() * config.borderWidth * 0.7; // Réduit de 1.0 à 0.7
         
         // Calcul de la position Y basée sur les courbes (avec amplitude réduite)
         let baseY = 0;
@@ -1138,26 +1138,26 @@ function createParticles() {
         // Distribution extrême pour certaines particules
         const rand = Math.random();
         if (rand < 0.3) { // 30% des particules vers le bas
-            baseY -= (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
+            baseY -= (Math.random() * 0.6 + 0.2) * heightVariation * 1.0;
         } else if (rand < 0.6) { // 30% des particules vers le haut
-            baseY += (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
+            baseY += (Math.random() * 0.6 + 0.2) * heightVariation * 1.0;
         }
 
         // Ajout d'une variation aléatoire standard pour toutes les particules
-        baseY += (Math.random() * 2 - 1) * heightVariation * 0.4; // Réduit de 0.6 à 0.4
+        baseY += (Math.random() * 2 - 1) * heightVariation * 0.4;
 
         // Ajout du bruit avec variation ajustée
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.25; // Réduit de 0.3 à 0.25
-        baseY += noiseValue * (heightVariation * 0.9); // Réduit de 1.2 à 0.9
+        const noiseValue = Math.sin(angle * config.noiseScale) * 0.25;
+        baseY += noiseValue * (heightVariation * 0.9);
 
         // Distribution secondaire pour plus de variété mais plus resserrée
         if (Math.random() < 0.4) { // 40% des particules
             const direction = Math.random() < 0.5 ? 1 : -1;
-            baseY += direction * Math.random() * heightVariation * 0.3; // Réduit de 0.4 à 0.3
+            baseY += direction * Math.random() * heightVariation * 0.3;
         }
 
         // Ajout d'une légère attraction vers les courbes principales
-        const attractionStrength = 0.15; // Force d'attraction vers le centre
+        const attractionStrength = 0.15;
         baseY *= (1 - attractionStrength);
 
         // Calcul de la position de base sur le cercle
@@ -1165,10 +1165,10 @@ function createParticles() {
         const baseX = Math.cos(angle) * baseRadius;
         const baseZ = Math.sin(angle) * baseRadius;
 
-        // Calcul des offsets pour la position finale
-        const offsetX = Math.cos(radialAngle) * radialOffset;
-        const offsetY = (Math.random() - 0.5) * config.borderWidth;
-        const offsetZ = Math.sin(radialAngle) * radialOffset;
+        // Calcul des offsets pour la position finale avec amplitude réduite
+        const offsetX = Math.cos(radialAngle) * radialOffset * 0.7;
+        const offsetY = (Math.random() - 0.5) * config.borderWidth * 0.7;
+        const offsetZ = Math.sin(radialAngle) * radialOffset * 0.7;
 
         // Position initiale (plaquée sur le cercle avec Y modérément varié)
         borderInitialPositions[i3] = baseX;

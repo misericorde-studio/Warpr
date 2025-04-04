@@ -289,72 +289,87 @@
         }
 
         /* Media query pour les écrans mobiles */
-        @media screen and (max-width: 768px) {
+        @media (max-width: 768px) {
             .airdrop {
-                flex-direction: column;
-                min-height: auto;
-            }
-
-            .airdrop_left {
-                height: 60vh;
-                min-height: 400px;
                 position: relative;
-                flex: none;
-            }
-
-            #canvas-container {
-                height: calc(100% - 3.5rem);
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-            }
-
-            canvas {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
+                flex-direction: column;
+                min-height: 150vh;
+                background: #0B0E13;
+                overflow: visible;
             }
 
             .airdrop_right {
+                position: relative;
                 width: 100%;
-                min-width: 0;
-                box-shadow: none;
-                border-top: 1px solid rgba(255, 255, 255, 0.2);
+                min-width: 100%;
+                height: auto;
+                min-height: 90vh;
+                background: #0B0E13;
+                z-index: 1;
+            }
+
+            .airdrop_right_scroll {
+                position: relative;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
                 height: auto;
             }
 
             .airdrop_content {
-                gap: 2rem;
-                padding: 1.5rem;
+                padding: 2rem;
                 height: auto;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                gap: 2rem;
             }
 
-            .vertical-lines-wrapper {
-                height: 70%;
-                width: 90%;
+            .airdrop_content:last-child {
+                border-bottom: none;
+            }
+
+            .airdrop_left {
+                position: sticky;
+                top: 0;
+                width: 100%;
+                height: 60vh;
+                min-height: 60vh;
+                background: #0B0E13;
+                z-index: 2;
+            }
+
+            #canvas-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: calc(100% - 3.5rem);
+            }
+
+            canvas {
+                width: 100% !important;
+                height: 100% !important;
             }
 
             .loading-indicator {
                 position: absolute;
                 bottom: 0;
                 left: 0;
+                width: 100%;
+                height: 3.5rem;
+                z-index: 3;
             }
 
-            .crosses-wrapper {
-                height: calc(100% - 3.5rem);
-                position: absolute;
-                top: 0;
-                left: 0;
+            /* Styles de la scrollbar */
+            .airdrop_right_scroll::-webkit-scrollbar {
+                width: 4px;
             }
 
-            .lines {
-                height: calc(100% - 3.5rem);
-                position: absolute;
-                top: 0;
-                left: 0;
+            .airdrop_right_scroll::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            .airdrop_right_scroll::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 2px;
             }
         }
 

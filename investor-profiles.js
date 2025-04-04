@@ -6,7 +6,7 @@ const config = {
     radius: 1.5,
     particleCount: 1000,
     particleSize: 12.0,
-    curveAmplitude: 0.22,
+    curveAmplitude: 0.12,
     curveFrequency: 9,
     curvePhases: 4,
     noiseScale: 0.8,
@@ -43,7 +43,7 @@ let scene, camera, renderer, controls;
 let particles, borderParticles;
 let clock;
 let container;
-let heightVariation = 0.22;
+let heightVariation = 0.12;
 let lineThickness = 0.030;
 let lastScrollY = 0;
 let lastFrameTime = 0;
@@ -1518,6 +1518,7 @@ function setupControls() {
     curveAmplitudeControl.addEventListener('input', (e) => {
         const value = parseFloat(e.target.value);
         config.curveAmplitude = value;
+        heightVariation = value;
         curveAmplitudeValue.textContent = value.toFixed(2);
         updateParticles();
     });

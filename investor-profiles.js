@@ -76,7 +76,7 @@ let positions;
 // Tableaux de phases
 let phaseOffsets = [0, Math.PI/2, Math.PI, Math.PI*3/2];
 let frequencyMultipliers = [1, 0.5, 0.7, 0.3];
-let amplitudeMultipliers = [1.8, 0.9, 0.01, 0.002];
+let amplitudeMultipliers = [1.5, 0.7, 0.01, 0.002];
 
 // Pré-allocation des vecteurs et matrices pour éviter les allocations pendant l'animation
 const tempVector = new THREE.Vector3();
@@ -858,15 +858,27 @@ function createParticles() {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase];
             
-            // Création d'une asymétrie dans la forme de la courbe
+            // Création d'une courbe plus douce avec interpolation cubique
             const baseAngle = finalAngle * freq + phaseOffsets[phase];
             let value = Math.sin(baseAngle);
             
-            // Ajout d'une distorsion asymétrique
+            // Fonction d'adoucissement cubique avec variation
+            const smoothStep = (x, p) => {
+                // Ajoute une variation dans la courbe d'interpolation
+                return x * x * (3 - 2 * Math.pow(x, p));
+            };
+            
+            // Application de l'adoucissement avec forte asymétrie
             if (value > 0) {
-                value = Math.pow(value, 1.5); // Montée plus rapide
+                const t = value * 0.5 + 0.5;
+                // Montée plus abrupte avec variation
+                value = smoothStep(t, 0.7) * 2 - 1;
+                value = Math.pow(value, 2.2) * (0.8 + Math.cos(baseAngle * 0.5) * 0.2);
             } else {
-                value = -Math.pow(-value, 0.7); // Descente plus lente
+                const t = -value * 0.5 + 0.5;
+                // Descente plus progressive avec variation
+                value = -(smoothStep(t, 1.3) * 2 - 1);
+                value = -Math.pow(-value, 0.35) * (0.9 + Math.sin(baseAngle * 0.7) * 0.1);
             }
             
             if (progress > 0.95) {
@@ -926,15 +938,27 @@ function createParticles() {
             const freq = config.curveFrequency * frequencyMultipliers[phase];
             const amp = heightVariation * amplitudeMultipliers[phase];
             
-            // Création d'une asymétrie dans la forme de la courbe
+            // Création d'une courbe plus douce avec interpolation cubique
             const baseAngle = finalAngle * freq + phaseOffsets[phase];
             let value = Math.sin(baseAngle);
             
-            // Ajout d'une distorsion asymétrique
+            // Fonction d'adoucissement cubique avec variation
+            const smoothStep = (x, p) => {
+                // Ajoute une variation dans la courbe d'interpolation
+                return x * x * (3 - 2 * Math.pow(x, p));
+            };
+            
+            // Application de l'adoucissement avec forte asymétrie
             if (value > 0) {
-                value = Math.pow(value, 1.5); // Montée plus rapide
+                const t = value * 0.5 + 0.5;
+                // Montée plus abrupte avec variation
+                value = smoothStep(t, 0.7) * 2 - 1;
+                value = Math.pow(value, 2.2) * (0.8 + Math.cos(baseAngle * 0.5) * 0.2);
             } else {
-                value = -Math.pow(-value, 0.7); // Descente plus lente
+                const t = -value * 0.5 + 0.5;
+                // Descente plus progressive avec variation
+                value = -(smoothStep(t, 1.3) * 2 - 1);
+                value = -Math.pow(-value, 0.35) * (0.9 + Math.sin(baseAngle * 0.7) * 0.1);
             }
             
             if (progress > 0.95) {

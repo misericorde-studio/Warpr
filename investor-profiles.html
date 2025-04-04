@@ -644,6 +644,9 @@
     <script src="https://unpkg.com/lenis@1.2.3/dist/lenis.min.js"></script> 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            // Force le scroll en haut de la page au chargement
+            window.scrollTo(0, 0);
+            
             const lenis = new Lenis({
                 duration: 1.2,
                 easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -659,6 +662,14 @@
             // Supprime l'ancien RAF de Lenis
             // La mise à jour sera faite dans le RAF de Three.js
             window.lenis = lenis; // Rend lenis accessible globalement
+            
+            // Force une réinitialisation de Lenis
+            lenis.scrollTo(0, { immediate: true });
+        });
+
+        // Ajouter un gestionnaire pour le rechargement de la page
+        window.addEventListener('beforeunload', () => {
+            window.scrollTo(0, 0);
         });
     </script>
 </body>

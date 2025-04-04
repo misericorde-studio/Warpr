@@ -176,7 +176,7 @@ function init() {
     const baseWidth = 1920; // Largeur de référence
     const isMobile = window.innerWidth <= 768;
     const frustumSize = isMobile ? 
-        (baseWidth / container.clientWidth) * 4.8 : // Augmenté légèrement (était 4.2)
+        (baseWidth / container.clientWidth) * 3.2 : // Réduit pour augmenter la taille (était 4.8)
         (baseWidth / container.clientWidth) * 3.5;  // Taille normale pour desktop
     
     camera = new THREE.OrthographicCamera(
@@ -1240,7 +1240,7 @@ function onWindowResize() {
     const baseWidth = 1920; // Largeur de référence
     const isMobile = window.innerWidth <= 768;
     const frustumSize = isMobile ? 
-        (baseWidth / container.clientWidth) * 4.8 : // Augmenté légèrement (était 4.2)
+        (baseWidth / container.clientWidth) * 3.2 : // Réduit pour augmenter la taille (était 4.8)
         (baseWidth / container.clientWidth) * 3.5;  // Taille normale pour desktop
     
     camera.left = frustumSize * aspect / -2;

@@ -18,7 +18,7 @@ const config = {
     particleGlowColor: 0x4FFFC1,
     cameraDistance: -3,
     initialZoom: 2.10,
-    finalZoom: 0.8,
+    finalZoom: 1.0,
     cameraNear: 1,
     cameraFar: 2.2,
     initialFar: 2.2,

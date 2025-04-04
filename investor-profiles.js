@@ -13,9 +13,6 @@ const config = {
     noisePower: 1.2,
     backgroundColor: 0x0B0E13,
     particleColor: 0x00FEA5,
-    particleGlowIntensity: 1.0,
-    particleGlowRadius: 0.25,
-    particleGlowColor: 0x4FFFC1,
     cameraDistance: -3,
     initialZoom: 2.10,
     finalZoom: 1.0,
@@ -39,18 +36,12 @@ const config = {
 };
 
 // Variables globales
-let scene, camera, renderer, controls;
-let particles, borderParticles;
+let scene, camera, renderer, particles, borderParticles;
 let clock;
 let container;
 let heightVariation = 0.12;
 let lineThickness = 0.030;
-let lastScrollY = 0;
 let lastFrameTime = 0;
-let thresholdContainer, thresholdLine;
-let particleShader, borderShader;
-let isScrolling = false;
-let scrollTimeout;
 let hasPrewarmed = false;
 let targetRotationY = 0;
 let currentRotationY = 0;
@@ -62,8 +53,6 @@ let targetZoom = 2.10;
 let currentFar = 2.2;
 let targetFar = 2.2;
 let progressBar, progressValue;
-let targetLineWidth = 1;
-let currentLineWidth = 1;
 let targetLineOpacity = 1;
 let currentLineOpacity = 1;
 let planeMesh;
@@ -86,29 +75,18 @@ const tempMatrix = new THREE.Matrix4();
 // Cache pour les calculs de particules
 const particleCache = {
     positions: null,
-    rotations: null,
     phases: null,
-    offsets: null,
     deploymentProgress: null,
     thicknessProgress: null,
     borderPhases: null,
-    borderDeploymentProgress: null,
-    borderRadialProgress: null
+    borderDeploymentProgress: null
 };
 
 // Cache pour les calculs fréquents
 const mathCache = {
-    sin: new Float32Array(360),
-    cos: new Float32Array(360),
     phases: new Float32Array(config.particleCount + config.borderParticleCount),
     borderPhases: new Float32Array(config.particleCount + config.borderParticleCount)
 };
-
-// Pré-calcul des sinus et cosinus
-for (let i = 0; i < 360; i++) {
-    mathCache.sin[i] = Math.sin(i * Math.PI / 180);
-    mathCache.cos[i] = Math.cos(i * Math.PI / 180);
-}
 
 // Pré-calcul des phases aléatoires
 for (let i = 0; i < config.particleCount + config.borderParticleCount; i++) {
@@ -131,7 +109,6 @@ function noise1D(x) {
     x -= Math.floor(x);
     const fadeX = x * x * (3 - 2 * x);
     
-    // Utilisation de fonctions trigonométriques pour générer des valeurs pseudo-aléatoires
     const h1 = Math.sin(X * 12.9898) * 43758.5453123;
     const h2 = Math.sin((X + 1) * 12.9898) * 43758.5453123;
     
@@ -323,9 +300,11 @@ function init() {
 function initializeParticleCache() {
     const totalParticles = config.particleCount + config.borderParticleCount;
     particleCache.positions = new Float32Array(totalParticles * 3);
-    particleCache.rotations = new Float32Array(totalParticles * 4);
     particleCache.phases = new Float32Array(totalParticles);
-    particleCache.offsets = new Float32Array(totalParticles * 3);
+    particleCache.deploymentProgress = new Float32Array(totalParticles);
+    particleCache.thicknessProgress = new Float32Array(totalParticles);
+    particleCache.borderPhases = new Float32Array(totalParticles);
+    particleCache.borderDeploymentProgress = new Float32Array(totalParticles);
 }
 
 function updateProgressIndicator(scrollProgress) {
@@ -357,7 +336,6 @@ function animate(timestamp) {
     // Mise à jour de l'indicateur de progression
     updateProgressIndicator(scrollProgress);
 
-    // Animation des rotations
     if (particles) {
         // Rotation Y
         const normalizedProgress = scrollProgress / 100;
@@ -374,74 +352,20 @@ function animate(timestamp) {
         if (window.lenis) {
             const rotationLerp = window.lenis.options.lerp;
             
-            // Interpolation de la rotation Y
+            // Interpolation des rotations
             currentRotationY += (targetRotationY - currentRotationY) * rotationLerp;
-            particles.rotation.y = currentRotationY;
-            
-            // Interpolation de la rotation X
             currentRotationX += (targetRotationX - currentRotationX) * rotationLerp;
+            
+            particles.rotation.y = currentRotationY;
             particles.rotation.x = currentRotationX;
 
-            // Appliquer les rotations à la bordure
             if (borderParticles) {
                 borderParticles.rotation.copy(particles.rotation);
             }
         }
 
-        // Gestion du zoom
-        if (scrollProgress < 58) {
-            targetZoom = config.initialZoom;
-        } else if (scrollProgress >= 58 && scrollProgress <= 78) {
-            const zoomProgress = Math.min(1, (scrollProgress - 58) / 20);
-            targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
-        } else {
-            targetZoom = config.finalZoom;
-        }
-
-        // Gestion de la distance maximale de la caméra (séparée du zoom)
-        if (scrollProgress < 23) {
-            targetFar = config.initialFar;
-        } else if (scrollProgress >= 23 && scrollProgress <= 50) {
-            const farProgress = Math.min(1, (scrollProgress - 23) / 27);
-            targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
-        } else {
-            targetFar = config.finalFar;
-        }
-
-        // Interpolation douce avec Lenis
-        if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp * 0.8; // Réduit de 1.5 à 0.8 pour une transition plus fluide
-            
-            // Interpolation du zoom avec limitation de la variation
-            const zoomDelta = (targetZoom - currentZoom) * lerpFactor;
-            currentZoom += Math.abs(zoomDelta) > 0.0001 ? zoomDelta : (targetZoom - currentZoom);
-            camera.zoom = currentZoom;
-            
-            // Interpolation de la distance far avec limitation de la variation
-            const farDelta = (targetFar - currentFar) * lerpFactor;
-            currentFar += Math.abs(farDelta) > 0.0001 ? farDelta : (targetFar - currentFar);
-            camera.far = currentFar;
-            camera.near = Math.max(0.1, currentFar * 0.1);
-            
-            camera.updateProjectionMatrix();
-
-            // Ajuster l'échelle du rectangle pour le zoom courant
-            if (planeMesh) {
-                const scaleCompensation = config.initialZoom / currentZoom;
-                const frustumSize = (camera.top - camera.bottom);
-                const aspect = container.clientWidth / container.clientHeight;
-                
-                // Calcul de la largeur basé sur le diamètre du cercle (2 * radius)
-                const circleDiameter = config.radius * 2;
-                const targetWidth = circleDiameter * config.greenLine.width;
-                
-                planeMesh.scale.set(
-                    targetWidth * scaleCompensation,
-                    1,
-                    1
-                );
-            }
-        }
+        // Gestion du zoom et de la distance de la caméra
+        updateCameraParameters(scrollProgress);
     }
 
     // Mise à jour des particules
@@ -449,100 +373,106 @@ function animate(timestamp) {
         updateParticlesOptimized(timestamp, scrollProgress);
     }
 
-    // Mise à jour des particules de bordure
     if (borderParticles && borderParticles.geometry) {
         updateBorderParticlesOptimized(timestamp, scrollProgress);
     }
 
     // Animation du plan en fonction du scroll
+    updatePlaneSeparation(scrollProgress);
+
+    // Rendu optimisé
+    renderer.render(scene, camera);
+}
+
+// Nouvelle fonction pour gérer les paramètres de la caméra
+function updateCameraParameters(scrollProgress) {
+    if (scrollProgress < 58) {
+        targetZoom = config.initialZoom;
+    } else if (scrollProgress >= 58 && scrollProgress <= 78) {
+        const zoomProgress = Math.min(1, (scrollProgress - 58) / 20);
+        targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
+    } else {
+        targetZoom = config.finalZoom;
+    }
+
+    if (scrollProgress < 23) {
+        targetFar = config.initialFar;
+    } else if (scrollProgress >= 23 && scrollProgress <= 50) {
+        const farProgress = Math.min(1, (scrollProgress - 23) / 27);
+        targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
+    } else {
+        targetFar = config.finalFar;
+    }
+
+    if (window.lenis) {
+        const lerpFactor = window.lenis.options.lerp * 0.8;
+        
+        currentZoom += (targetZoom - currentZoom) * lerpFactor;
+        currentFar += (targetFar - currentFar) * lerpFactor;
+        
+        camera.zoom = currentZoom;
+        camera.far = currentFar;
+        camera.near = Math.max(0.1, currentFar * 0.1);
+        camera.updateProjectionMatrix();
+    }
+}
+
+// Nouvelle fonction pour gérer l'animation du plan de séparation
+function updatePlaneSeparation(scrollProgress) {
     if (scrollProgress <= 32) {
-        // De 0 à 32% : maintient 50% de hauteur
         config.clipPlaneHeight = 0.5;
         config.clipPlanePosition = 0.5;
         targetLineOpacity = 1;
-        
     } else if (scrollProgress <= 40) {
-        // De 32% à 40% : réduction à 40% de hauteur
         const progress = (scrollProgress - 32) / 8;
-        config.clipPlaneHeight = 0.5 - (progress * 0.1); // De 50% à 40%
+        config.clipPlaneHeight = 0.5 - (progress * 0.1);
         config.clipPlanePosition = 0.5;
         targetLineOpacity = 1;
-        
     } else if (scrollProgress <= 46) {
-        // De 40% à 46% : maintient 40% de hauteur
         config.clipPlaneHeight = 0.4;
         config.clipPlanePosition = 0.5;
         targetLineOpacity = 1;
-        
     } else if (scrollProgress <= 68) {
-        // De 46% à 68% : changement de hauteur et fade out de la ligne
-        const heightProgress = (scrollProgress - 46) / 22; // Garde la même progression pour la hauteur
-        const opacityProgress = (scrollProgress - 46) / 14; // Nouveau calcul pour que l'opacité atteigne 0 à 60%
+        const heightProgress = (scrollProgress - 46) / 22;
+        const opacityProgress = (scrollProgress - 46) / 14;
         targetLineOpacity = Math.max(0, 1 - opacityProgress);
-        config.clipPlaneHeight = 0.4 + (heightProgress * 0.6); // La hauteur continue jusqu'à 68%
-        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
-        
+        config.clipPlaneHeight = 0.4 + (heightProgress * 0.6);
+        config.clipPlanePosition = 0.5;
     } else {
-        // Au-delà de 68% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
-        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
+        config.clipPlanePosition = 0.5;
         targetLineOpacity = 0;
     }
 
-    // Mettre à jour les uniforms du plan
     updateClipPlane();
 
-    if (planeMesh) {
-        // Calcul de la position du plan dans l'espace NDC (-1 à 1)
-        const planeBottom = config.clipPlanePosition - config.clipPlaneHeight;
+    if (planeMesh && window.lenis) {
+        const lerpFactor = window.lenis.options.lerp;
+        const worldY = (config.clipPlanePosition - config.clipPlaneHeight) * 2;
         
-        // Conversion de l'espace NDC (-1 à 1) vers l'espace monde
-        const worldY = planeBottom * 2;
+        planeMesh.position.y += (worldY - planeMesh.position.y) * lerpFactor;
+        currentLineOpacity += (targetLineOpacity - currentLineOpacity) * lerpFactor;
         
-        // Interpolation de la position Y avec Lenis
-        if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp;
-            planeMesh.position.y += (worldY - planeMesh.position.y) * lerpFactor;
-            currentLineOpacity += (targetLineOpacity - currentLineOpacity) * lerpFactor;
-        } else {
-            planeMesh.position.y = worldY;
-            currentLineOpacity = targetLineOpacity;
-        }
-        
-        // Mettre à jour la position dans le shader des particules
-        if (particles && particles.material && particles.material.uniforms) {
+        // Mise à jour des uniforms
+        if (particles && particles.material.uniforms) {
             particles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
             particles.material.uniforms.clipPlanePosition.value = planeMesh.position.y / 2;
         }
         
-        if (borderParticles && borderParticles.material && borderParticles.material.uniforms) {
+        if (borderParticles && borderParticles.material.uniforms) {
             borderParticles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
             borderParticles.material.uniforms.clipPlanePosition.value = planeMesh.position.y / 2;
         }
         
-        // Ajuste l'échelle du plan en fonction du zoom de la caméra
+        // Mise à jour de l'échelle et de l'opacité
         const scaleCompensation = config.initialZoom / camera.zoom;
-        const frustumSize = (camera.top - camera.bottom);
-        const aspect = container.clientWidth / container.clientHeight;
-        
-        // Calcul de la largeur basé sur le diamètre du cercle (2 * radius)
         const circleDiameter = config.radius * 2;
         const targetWidth = circleDiameter * config.greenLine.width;
         
-        // Appliquer l'échelle
-        planeMesh.scale.set(
-            targetWidth * scaleCompensation,
-            1,
-            1
-        );
-        
-        // Appliquer l'opacité interpolée au matériau
+        planeMesh.scale.set(targetWidth * scaleCompensation, 1, 1);
         planeMesh.material.opacity = currentLineOpacity;
         planeMesh.visible = currentLineOpacity > 0.001;
     }
-
-    // Rendu optimisé
-    renderer.render(scene, camera);
 }
 
 // Nouvelle fonction pour la mise à jour des particules de bordure
@@ -571,15 +501,11 @@ function updateBorderParticlesOptimized(timestamp, scrollProgress) {
     if (!particleCache.borderDeploymentProgress) {
         particleCache.borderDeploymentProgress = new Float32Array(totalParticles);
     }
-    if (!particleCache.borderRadialProgress) {
-        particleCache.borderRadialProgress = new Float32Array(totalParticles);
-    }
     
     // Calculer les valeurs cibles en fonction du scroll
     const isDeploying = scrollProgress >= 60;
     const deploymentProgress = isDeploying ? (scrollProgress - 60) / 30 : 0;
     const targetDeployment = Math.min(1, deploymentProgress);
-    const targetRadial = Math.min(1, deploymentProgress);
     
     for (let batch = 0; batch < totalParticles; batch += batchSize) {
         const end = Math.min(batch + batchSize, totalParticles);
@@ -601,16 +527,11 @@ function updateBorderParticlesOptimized(timestamp, scrollProgress) {
             if (particleCache.borderDeploymentProgress[i] === undefined) {
                 particleCache.borderDeploymentProgress[i] = 0;
             }
-            if (particleCache.borderRadialProgress[i] === undefined) {
-                particleCache.borderRadialProgress[i] = 0;
-            }
 
             // Interpolation des progressions avec Lenis
             particleCache.borderDeploymentProgress[i] += (targetDeployment - particleCache.borderDeploymentProgress[i]) * deploymentLerp;
-            particleCache.borderRadialProgress[i] += (targetRadial - particleCache.borderRadialProgress[i]) * deploymentLerp;
 
             const currentDeployment = particleCache.borderDeploymentProgress[i];
-            const currentRadial = particleCache.borderRadialProgress[i];
 
             // Calculer la position déployée
             const deployedX = initialPositions[i3] + (finalPositions[i3] - initialPositions[i3]) * currentDeployment;
@@ -628,10 +549,10 @@ function updateBorderParticlesOptimized(timestamp, scrollProgress) {
             let radialOffset;
             if (radialDirection > 0) {
                 // Pour les particules allant vers l'extérieur (radialDirection = 1)
-                radialOffset = currentRadial * 0.05 * radialDirection;
+                radialOffset = currentDeployment * 0.05 * radialDirection;
             } else {
                 // Pour les particules allant vers l'intérieur (radialDirection = -1) ou restant sur place (radialDirection = 0)
-                radialOffset = currentRadial * 0.08 * radialDirection;
+                radialOffset = currentDeployment * 0.08 * radialDirection;
             }
 
             baseX = deployedX + dirX * radialOffset;

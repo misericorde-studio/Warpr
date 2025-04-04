@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Configuration
 const config = {
     radius: 1.5,
-    particleCount: 800,
+    particleCount: 500,
     particleSize: 12.0,
     curveAmplitude: 0.13,
     curveFrequency: 9,

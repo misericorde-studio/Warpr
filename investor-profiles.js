@@ -399,10 +399,10 @@ function animate(timestamp) {
         }
 
         // Gestion de la distance maximale de la caméra (séparée du zoom)
-        if (scrollProgress < 25) {
+        if (scrollProgress < 23) {
             targetFar = config.initialFar;
-        } else if (scrollProgress >= 25 && scrollProgress <= 45) {
-            const farProgress = Math.min(1, (scrollProgress - 25) / 20);
+        } else if (scrollProgress >= 23 && scrollProgress <= 50) {
+            const farProgress = Math.min(1, (scrollProgress - 23) / 27);
             targetFar = config.initialFar + (config.finalFar - config.initialFar) * farProgress;
         } else {
             targetFar = config.finalFar;
@@ -410,7 +410,7 @@ function animate(timestamp) {
 
         // Interpolation douce avec Lenis
         if (window.lenis) {
-            const lerpFactor = window.lenis.options.lerp * 1.5;
+            const lerpFactor = window.lenis.options.lerp * 0.8; // Réduit de 1.5 à 0.8 pour une transition plus fluide
             
             // Interpolation du zoom avec limitation de la variation
             const zoomDelta = (targetZoom - currentZoom) * lerpFactor;
@@ -474,15 +474,15 @@ function animate(timestamp) {
         config.clipPlanePosition = 0.5;
         targetLineOpacity = 1;
         
-    } else if (scrollProgress <= 51) {
-        // De 46% à 51% : fade out de la ligne
-        const fadeProgress = (scrollProgress - 46) / 5;
+    } else if (scrollProgress <= 68) {
+        // De 46% à 68% : fade out de la ligne
+        const fadeProgress = (scrollProgress - 46) / 22;
         targetLineOpacity = Math.max(0, 1 - fadeProgress);
         config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {
-        // Au-delà de 51% : maintient 100% et ligne invisible
+        // Au-delà de 68% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         targetLineOpacity = 0;
@@ -1490,15 +1490,15 @@ function updateScroll() {
         config.clipPlanePosition = 0.5;
         targetLineOpacity = 1;
         
-    } else if (scrollProgress <= 51) {
-        // De 46% à 51% : fade out de la ligne
-        const fadeProgress = (scrollProgress - 46) / 5;
+    } else if (scrollProgress <= 68) {
+        // De 46% à 68% : fade out de la ligne
+        const fadeProgress = (scrollProgress - 46) / 22;
         targetLineOpacity = Math.max(0, 1 - fadeProgress);
         config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {
-        // Au-delà de 51% : maintient 100% et ligne invisible
+        // Au-delà de 68% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         targetLineOpacity = 0;

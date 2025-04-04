@@ -164,14 +164,21 @@ function init() {
     // Création de l'observer pour la visibilité
     visibilityObserver = createObserver(container);
     
+    // Ajustement du pixel ratio en fonction de la taille de l'écran
+    const pixelRatio = window.innerWidth <= 768 ? Math.min(window.devicePixelRatio, 2) : 1;
+    
     // Scène principale
     scene = new THREE.Scene();
     scene.background = new THREE.Color(config.backgroundColor);
 
-    // Caméra orthographique
+    // Caméra orthographique avec frustum ajusté pour mobile
     const aspect = container.clientWidth / container.clientHeight;
     const baseWidth = 1920; // Largeur de référence
-    const frustumSize = (baseWidth / container.clientWidth) * 3.5;
+    const isMobile = window.innerWidth <= 768;
+    const frustumSize = isMobile ? 
+        (baseWidth / container.clientWidth) * 2.5 : // Taille réduite pour mobile
+        (baseWidth / container.clientWidth) * 3.5;  // Taille normale pour desktop
+    
     camera = new THREE.OrthographicCamera(
         frustumSize * aspect / -2,
         frustumSize * aspect / 2,
@@ -201,7 +208,7 @@ function init() {
     });
     
     renderer.setSize(container.clientWidth, container.clientHeight, false);
-    renderer.setPixelRatio(1);
+    renderer.setPixelRatio(pixelRatio);
     renderer.setClearColor(0x0B0E13, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = false;
@@ -1231,7 +1238,10 @@ function onWindowResize() {
     
     const aspect = container.clientWidth / container.clientHeight;
     const baseWidth = 1920; // Largeur de référence
-    const frustumSize = (baseWidth / container.clientWidth) * 3.5;
+    const isMobile = window.innerWidth <= 768;
+    const frustumSize = isMobile ? 
+        (baseWidth / container.clientWidth) * 2.5 : // Taille réduite pour mobile
+        (baseWidth / container.clientWidth) * 3.5;  // Taille normale pour desktop
     
     camera.left = frustumSize * aspect / -2;
     camera.right = frustumSize * aspect / 2;
@@ -1239,17 +1249,20 @@ function onWindowResize() {
     camera.bottom = frustumSize / -2;
     camera.updateProjectionMatrix();
     
-    // Mettre à jour l'échelle des particules
-    const scaleFactor = container.clientWidth / baseWidth;
+    // Mettre à jour l'échelle des particules avec un facteur plus grand sur mobile
+    const scaleFactor = container.clientWidth / baseWidth * (isMobile ? 1.5 : 1.0);
     if (particles && particles.material.uniforms) {
         particles.material.uniforms.scaleFactor.value = scaleFactor;
-        particles.material.uniforms.pointSize.value = config.particleSize;
+        particles.material.uniforms.pointSize.value = config.particleSize * (isMobile ? 1.2 : 1.0);
     }
     if (borderParticles && borderParticles.material.uniforms) {
         borderParticles.material.uniforms.scaleFactor.value = scaleFactor;
-        borderParticles.material.uniforms.pointSize.value = config.borderParticleSize;
+        borderParticles.material.uniforms.pointSize.value = config.borderParticleSize * (isMobile ? 1.2 : 1.0);
     }
     
+    // Ajuster le pixel ratio pour mobile
+    const pixelRatio = isMobile ? Math.min(window.devicePixelRatio, 2) : 1;
+    renderer.setPixelRatio(pixelRatio);
     renderer.setSize(container.clientWidth, container.clientHeight);
 }
 

@@ -509,8 +509,14 @@ function animate(timestamp) {
         }
         
         // Mettre à jour la position dans le shader des particules
-        if (particles && particles.material && particles.material.uniforms && particles.material.uniforms.linePosition) {
-            particles.material.uniforms.linePosition.value = planeMesh.position.y;
+        if (particles && particles.material && particles.material.uniforms) {
+            particles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
+            particles.material.uniforms.clipPlanePosition.value = planeMesh.position.y / 2;
+        }
+        
+        if (borderParticles && borderParticles.material && borderParticles.material.uniforms) {
+            borderParticles.material.uniforms.clipPlaneHeight.value = config.clipPlaneHeight;
+            borderParticles.material.uniforms.clipPlanePosition.value = planeMesh.position.y / 2;
         }
         
         // Ajuste l'échelle du plan en fonction du zoom de la caméra
@@ -1090,12 +1096,12 @@ function createParticles() {
                     discard;
                 }
                 
-                vec3 color = vec3(1.0);
-                float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
+                // Définir les couleurs de base
+                vec3 whiteColor = vec3(1.0);
+                vec3 greenColor = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 
-                if (vY >= threshold) {
-                    color = vec3(0.0, 254.0/255.0, 165.0/255.0);
-                }
+                // Utiliser la position Y de la ligne comme seuil, en ajustant l'espace de coordonnées
+                vec3 color = vY > clipPlanePosition * 2.0 ? greenColor : whiteColor;
                 
                 gl_FragColor = vec4(color, alpha);
             }
@@ -1293,12 +1299,12 @@ function createParticles() {
                     discard;
                 }
                 
-                vec3 color = vec3(1.0);
-                float threshold = (clipPlanePosition - clipPlaneHeight) * 2.0;
+                // Définir les couleurs de base
+                vec3 whiteColor = vec3(1.0);
+                vec3 greenColor = vec3(0.0, 254.0/255.0, 165.0/255.0);
                 
-                if (vY >= threshold) {
-                    color = vec3(0.0, 254.0/255.0, 165.0/255.0);
-                }
+                // Utiliser la position Y de la ligne comme seuil, en ajustant l'espace de coordonnées
+                vec3 color = vY > clipPlanePosition * 2.0 ? greenColor : whiteColor;
                 
                 gl_FragColor = vec4(color, alpha);
             }

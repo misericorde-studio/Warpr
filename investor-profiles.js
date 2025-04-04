@@ -56,6 +56,9 @@ let progressBar, progressValue;
 let targetLineOpacity = 1;
 let currentLineOpacity = 1;
 let planeMesh;
+let isScrolling = false;
+let scrollTimeout;
+let lastScrollY = 0;
 
 // Tableaux de positions
 let mainInitialPositions;

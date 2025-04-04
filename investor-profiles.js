@@ -33,7 +33,7 @@ const config = {
     borderColor: 0xFFFFFF,
     thicknessVariationMultiplier: 5.0,
     greenLine: {
-        width: 0.58,
+        width: 1.0,
         height: 0.02
     }
 };
@@ -430,7 +430,10 @@ function animate(timestamp) {
                 const scaleCompensation = config.initialZoom / currentZoom;
                 const frustumSize = (camera.top - camera.bottom);
                 const aspect = container.clientWidth / container.clientHeight;
-                const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+                
+                // Calcul de la largeur basé sur le diamètre du cercle (2 * radius)
+                const circleDiameter = config.radius * 2;
+                const targetWidth = circleDiameter * config.greenLine.width;
                 
                 planeMesh.scale.set(
                     targetWidth * scaleCompensation,
@@ -514,7 +517,10 @@ function animate(timestamp) {
         const scaleCompensation = config.initialZoom / camera.zoom;
         const frustumSize = (camera.top - camera.bottom);
         const aspect = container.clientWidth / container.clientHeight;
-        const targetWidth = frustumSize * aspect * 0.5 * config.greenLine.width;
+        
+        // Calcul de la largeur basé sur le diamètre du cercle (2 * radius)
+        const circleDiameter = config.radius * 2;
+        const targetWidth = circleDiameter * config.greenLine.width;
         
         // Appliquer l'échelle
         planeMesh.scale.set(

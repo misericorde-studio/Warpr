@@ -479,12 +479,12 @@ function animate(timestamp) {
         const fadeProgress = (scrollProgress - 46) / 5;
         targetLineOpacity = Math.max(0, 1 - fadeProgress);
         config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
-        config.clipPlanePosition = 0.5 - (fadeProgress * 0.5); // Descend au centre
+        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {
         // Au-delà de 51% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
-        config.clipPlanePosition = 0.0;
+        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         targetLineOpacity = 0;
     }
 
@@ -1495,12 +1495,12 @@ function updateScroll() {
         const fadeProgress = (scrollProgress - 46) / 5;
         targetLineOpacity = Math.max(0, 1 - fadeProgress);
         config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
-        config.clipPlanePosition = 0.5 - (fadeProgress * 0.5); // Descend au centre
+        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {
         // Au-delà de 51% : maintient 100% et ligne invisible
         config.clipPlaneHeight = 1.0;
-        config.clipPlanePosition = 0.0;
+        config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         targetLineOpacity = 0;
     }
 

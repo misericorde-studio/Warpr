@@ -6,7 +6,7 @@ const config = {
     radius: 1.5,
     particleCount: 1000,
     particleSize: 12.0,
-    curveAmplitude: 0.15,
+    curveAmplitude: 0.13,
     curveFrequency: 9,
     curvePhases: 4,
     noiseScale: 0.8,
@@ -848,15 +848,15 @@ function createParticles() {
         const finalZ = Math.sin(finalAngle) * finalRadius;
 
         // Calcul de la hauteur Y avec distribution contrôlée
-        const thicknessVariation = Math.max(0, Math.min(1, (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.6)));
+        const thicknessVariation = Math.max(0, Math.min(1, (Math.abs(Math.cos(finalAngle * 2)) + Math.abs(Math.sin(finalAngle * 3))) * (config.thicknessVariationMultiplier * 0.5))); // Réduit de 0.6 à 0.5
         const baseThickness = Math.max(0.001, lineThickness * (1 + thicknessVariation));
-        const randomY = (Math.random() * 2 - 1) * baseThickness;
+        const randomY = (Math.random() * 2 - 1) * baseThickness * 0.9; // Ajout d'un facteur de réduction 0.9
         let y = randomY;
         
         // Ajout des variations de hauteur de manière plus régulière
         for (let phase = 0; phase < config.curvePhases; phase++) {
             const freq = config.curveFrequency * (frequencyMultipliers[phase] || 1);
-            const amp = heightVariation * (amplitudeMultipliers[phase] || 1);
+            const amp = heightVariation * (amplitudeMultipliers[phase] || 1) * 0.9; // Ajout d'un facteur de réduction 0.9
             
             let value = Math.sin(finalAngle * freq + (phaseOffsets[phase] || 0)) || 0;
             
@@ -869,7 +869,7 @@ function createParticles() {
         }
 
         // Ajout du bruit avec une influence réduite
-        const noiseValue = (noise1D(finalAngle * config.noiseScale) || 0) * 0.2 + (Math.random() - 0.5) * 0.1;
+        const noiseValue = (noise1D(finalAngle * config.noiseScale) || 0) * 0.18 + (Math.random() - 0.5) * 0.08; // Réduit de 0.2 à 0.18 et de 0.1 à 0.08
         y += (noiseValue * heightVariation) || 0;
 
         // S'assurer que y est un nombre valide
@@ -934,23 +934,27 @@ function createParticles() {
         // Distribution extrême pour certaines particules
         const rand = Math.random();
         if (rand < 0.3) { // 30% des particules vers le bas
-            y -= (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+            y -= (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
         } else if (rand < 0.6) { // 30% des particules vers le haut
-            y += (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+            y += (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
         }
 
         // Ajout d'une variation aléatoire standard pour toutes les particules
-        y += (Math.random() * 2 - 1) * heightVariation * 0.6; // Réduit de 0.8 à 0.6
+        y += (Math.random() * 2 - 1) * heightVariation * 0.4; // Réduit de 0.6 à 0.4
 
         // Ajout du bruit avec variation ajustée
-        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.3; // Réduit de 0.35 à 0.3
-        y += noiseValue * (heightVariation * 1.2); // Réduit de 1.5 à 1.2
+        const noiseValue = Math.sin(finalAngle * config.noiseScale) * 0.25; // Réduit de 0.3 à 0.25
+        y += noiseValue * (heightVariation * 0.9); // Réduit de 1.2 à 0.9
 
-        // Distribution secondaire pour plus de variété
+        // Distribution secondaire pour plus de variété mais plus resserrée
         if (Math.random() < 0.4) { // 40% des particules
             const direction = Math.random() < 0.5 ? 1 : -1;
-            y += direction * Math.random() * heightVariation * 0.4; // Réduit de 0.6 à 0.4
+            y += direction * Math.random() * heightVariation * 0.3; // Réduit de 0.4 à 0.3
         }
+
+        // Ajout d'une légère attraction vers les courbes principales
+        const attractionStrength = 0.15; // Force d'attraction vers le centre
+        y *= (1 - attractionStrength);
 
         // S'assurer que y est un nombre valide
         y = Math.max(-10, Math.min(10, y || 0));
@@ -1134,23 +1138,27 @@ function createParticles() {
         // Distribution extrême pour certaines particules
         const rand = Math.random();
         if (rand < 0.3) { // 30% des particules vers le bas
-            baseY -= (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+            baseY -= (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
         } else if (rand < 0.6) { // 30% des particules vers le haut
-            baseY += (Math.random() * 0.8 + 0.2) * heightVariation * 1.3; // Réduit de 1.8 à 1.3
+            baseY += (Math.random() * 0.6 + 0.2) * heightVariation * 1.0; // Réduit de 0.8 à 0.6 et de 1.3 à 1.0
         }
 
         // Ajout d'une variation aléatoire standard pour toutes les particules
-        baseY += (Math.random() * 2 - 1) * heightVariation * 0.6; // Réduit de 0.8 à 0.6
+        baseY += (Math.random() * 2 - 1) * heightVariation * 0.4; // Réduit de 0.6 à 0.4
 
         // Ajout du bruit avec variation ajustée
-        const noiseValue = Math.sin(angle * config.noiseScale) * 0.3; // Réduit de 0.35 à 0.3
-        baseY += noiseValue * (heightVariation * 1.2); // Réduit de 1.5 à 1.2
+        const noiseValue = Math.sin(angle * config.noiseScale) * 0.25; // Réduit de 0.3 à 0.25
+        baseY += noiseValue * (heightVariation * 0.9); // Réduit de 1.2 à 0.9
 
-        // Distribution secondaire pour plus de variété
+        // Distribution secondaire pour plus de variété mais plus resserrée
         if (Math.random() < 0.4) { // 40% des particules
             const direction = Math.random() < 0.5 ? 1 : -1;
-            baseY += direction * Math.random() * heightVariation * 0.4; // Réduit de 0.6 à 0.4
+            baseY += direction * Math.random() * heightVariation * 0.3; // Réduit de 0.4 à 0.3
         }
+
+        // Ajout d'une légère attraction vers les courbes principales
+        const attractionStrength = 0.15; // Force d'attraction vers le centre
+        baseY *= (1 - attractionStrength);
 
         // Calcul de la position de base sur le cercle
         const baseRadius = config.radius + ((i % 3) - 1) * lineThickness;

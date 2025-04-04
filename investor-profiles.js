@@ -363,8 +363,8 @@ function animate(timestamp) {
         const normalizedProgress = scrollProgress / 100;
         targetRotationY = -(normalizedProgress) * (180 * Math.PI / 180);
         
-        if (scrollProgress > 60) {
-            const rotationProgress = (scrollProgress - 60) / 21;
+        if (scrollProgress > 58) {
+            const rotationProgress = (scrollProgress - 58) / 20;
             targetRotationX = -(Math.min(1, rotationProgress)) * (90 * Math.PI / 180);
         } else {
             targetRotationX = 0;
@@ -389,10 +389,10 @@ function animate(timestamp) {
         }
 
         // Gestion du zoom
-        if (scrollProgress < 60) {
+        if (scrollProgress < 58) {
             targetZoom = config.initialZoom;
-        } else if (scrollProgress >= 60 && scrollProgress <= 81) {
-            const zoomProgress = Math.min(1, (scrollProgress - 60) / 21);
+        } else if (scrollProgress >= 58 && scrollProgress <= 78) {
+            const zoomProgress = Math.min(1, (scrollProgress - 58) / 20);
             targetZoom = config.initialZoom + (config.finalZoom - config.initialZoom) * zoomProgress;
         } else {
             targetZoom = config.finalZoom;
@@ -475,10 +475,11 @@ function animate(timestamp) {
         targetLineOpacity = 1;
         
     } else if (scrollProgress <= 68) {
-        // De 46% à 68% : fade out de la ligne
-        const fadeProgress = (scrollProgress - 46) / 22;
-        targetLineOpacity = Math.max(0, 1 - fadeProgress);
-        config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
+        // De 46% à 68% : changement de hauteur et fade out de la ligne
+        const heightProgress = (scrollProgress - 46) / 22; // Garde la même progression pour la hauteur
+        const opacityProgress = (scrollProgress - 46) / 14; // Nouveau calcul pour que l'opacité atteigne 0 à 60%
+        targetLineOpacity = Math.max(0, 1 - opacityProgress);
+        config.clipPlaneHeight = 0.4 + (heightProgress * 0.6); // La hauteur continue jusqu'à 68%
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {
@@ -1491,10 +1492,11 @@ function updateScroll() {
         targetLineOpacity = 1;
         
     } else if (scrollProgress <= 68) {
-        // De 46% à 68% : fade out de la ligne
-        const fadeProgress = (scrollProgress - 46) / 22;
-        targetLineOpacity = Math.max(0, 1 - fadeProgress);
-        config.clipPlaneHeight = 0.4 + (fadeProgress * 0.6); // De 40% à 100%
+        // De 46% à 68% : changement de hauteur et fade out de la ligne
+        const heightProgress = (scrollProgress - 46) / 22; // Garde la même progression pour la hauteur
+        const opacityProgress = (scrollProgress - 46) / 14; // Nouveau calcul pour que l'opacité atteigne 0 à 60%
+        targetLineOpacity = Math.max(0, 1 - opacityProgress);
+        config.clipPlaneHeight = 0.4 + (heightProgress * 0.6); // La hauteur continue jusqu'à 68%
         config.clipPlanePosition = 0.5; // Maintient la position à 0.5
         
     } else {

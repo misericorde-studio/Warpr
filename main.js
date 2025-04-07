@@ -674,15 +674,25 @@ class Particle {
             this.floatPhase = Math.random() * Math.PI * 2;
             this.floatAmplitude = 0.04 + Math.random() * 0.04;
             
-            console.log('Paramètres de flottement initialisés dans resetParticle:', {
-                isStatic: this.isStatic,
-                isInnerCircle: this.isInnerCircle,
-                isAdditionalCircle: this.isAdditionalCircle,
-                additionalCircleIndex: this.additionalCircleIndex,
-                floatSpeed: this.floatSpeed,
-                floatPhase: this.floatPhase,
-                floatAmplitude: this.floatAmplitude
-            });
+            // Mettre à jour la position initiale
+            this.x = Math.cos(this.angle) * this.radius;
+            this.z = Math.sin(this.angle) * this.radius;
+            this.y = 0;
+            
+            // Mettre à jour la position finale
+            this.targetX = this.x;
+            this.targetZ = this.z;
+            this.targetY = this.y;
+            
+            // Mettre à jour la position actuelle
+            this.currentX = this.x;
+            this.currentZ = this.z;
+            this.currentY = this.y;
+            
+            // Mettre à jour la vélocité
+            this.velocityX = 0;
+            this.velocityZ = 0;
+            this.velocityY = 0;
         } else {
             // Réinitialiser en tant que particule du cercle extérieur
             this.resetOuterParticle();

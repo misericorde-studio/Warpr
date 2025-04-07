@@ -375,89 +375,6 @@
                 border-radius: 2px;
             }
         }
-
-        #controls-panel {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(11, 14, 19, 0.95);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            min-width: 300px;
-        }
-
-        .control-group {
-            margin-bottom: 15px;
-        }
-
-        .control-group label {
-            display: block;
-            font-size: 0.625em;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .control-group input[type="range"] {
-            width: 200px;
-            margin-right: 10px;
-            accent-color: #00FEA5;
-        }
-
-        .control-value {
-            font-size: 0.625em;
-            color: #00FEA5;
-            min-width: 40px;
-            display: inline-block;
-        }
-
-        .slider-container {
-            display: flex;
-            align-items: center;
-        }
-
-        #toggle-controls, #show-controls {
-            background: #00FEA5;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            color: #0B0E13;
-            font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif;
-            font-size: 0.625em;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        #toggle-controls:hover, #show-controls:hover {
-            background: #4FFFC1;
-        }
-
-        #show-controls:hover {
-            background: rgba(0, 254, 165, 0.3);
-            border-color: rgba(0, 254, 165, 0.5);
-        }
-
-        .scroll-section {
-            width: 100vw;
-            height: 100vh;
-            background-color: #1A1A1A;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .scroll-section p {
-            color: rgba(255, 255, 255, 0.3);
-            text-transform: uppercase;
-            font-size: clamp(1rem, 1em, 2rem);
-            letter-spacing: 0.1em;
-        }
     </style>
 </head>
 <body>
@@ -546,107 +463,6 @@
         <p>scroll end</p>
     </section>
 
-    <div id="controls-panel" style="display: none;">
-        <div class="control-group">
-            <label for="curve-count">Nombre de courbes</label>
-            <div class="slider-container">
-                <input type="range" id="curve-count" min="2" max="16" step="1" value="9">
-                <span class="control-value" id="curve-count-value">9</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="main-particle-size">Taille des particules (cercle)</label>
-            <div class="slider-container">
-                <input type="range" id="main-particle-size" min="4" max="16" step="0.1" value="12.0">
-                <span class="control-value" id="main-particle-size-value">12.0</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="border-particle-size">Taille des particules (bordure)</label>
-            <div class="slider-container">
-                <input type="range" id="border-particle-size" min="4" max="16" step="0.1" value="8.06">
-                <span class="control-value" id="border-particle-size-value">8.06</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="particle-count">Nombre de particules</label>
-            <div class="slider-container">
-                <input type="range" id="particle-count" min="1000" max="5000" step="100" value="2600">
-                <span class="control-value" id="particle-count-value">2600</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="curve-amplitude">Amplitude des courbes</label>
-            <div class="slider-container">
-                <input type="range" id="curve-amplitude" min="0.05" max="0.5" step="0.01" value="0.22">
-                <span class="control-value" id="curve-amplitude-value">0.22</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="max-thickness">Épaisseur max sur Y</label>
-            <div class="slider-container">
-                <input type="range" id="max-thickness" min="0.02" max="0.1" step="0.005" value="0.030">
-                <span class="control-value" id="max-thickness-value">0.030</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="min-thickness">Épaisseur min sur Y</label>
-            <div class="slider-container">
-                <input type="range" id="min-thickness" min="0.005" max="0.05" step="0.005" value="0.005">
-                <span class="control-value" id="min-thickness-value">0.005</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="line-width">Largeur de la ligne verte</label>
-            <div class="slider-container">
-                <input type="range" id="line-width" min="0.1" max="2" step="0.1" value="1">
-                <span class="control-value" id="line-width-value">1.0</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="camera-far">Distance maximale caméra</label>
-            <div class="slider-container">
-                <input type="range" id="camera-far" min="1" max="10" step="0.1" value="2.2">
-                <span class="control-value" id="camera-far-value">2.2</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="clip-plane-height">Hauteur du plan de référence</label>
-            <div class="slider-container">
-                <input type="range" id="clip-plane-height" min="0" max="1" step="0.01" value="0.5">
-                <span class="control-value" id="clip-plane-height-value">0.50</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="clip-plane-position">Position du plan de référence</label>
-            <div class="slider-container">
-                <input type="range" id="clip-plane-position" min="-1" max="1" step="0.01" value="0">
-                <span class="control-value" id="clip-plane-position-value">0.00</span>
-            </div>
-        </div>
-
-        <!-- Contrôles pour le zoom de la caméra -->
-        <div class="control-group">
-            <label for="initial-zoom">Zoom initial</label>
-            <div class="slider-container">
-                <input type="range" id="initial-zoom" min="0.5" max="3" step="0.1" value="2.10">
-                <span class="control-value" id="initial-zoom-value">2.10</span>
-            </div>
-        </div>
-        <div class="control-group">
-            <label for="final-zoom">Zoom final</label>
-            <div class="slider-container">
-                <input type="range" id="final-zoom" min="0.5" max="3" step="0.1" value="1.10">
-                <span class="control-value" id="final-zoom-value">1.10</span>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <button id="toggle-controls">Masquer les contrôles</button>
-        </div>
-    </div>
-    <button id="show-controls" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: rgba(0, 254, 165, 0.2); border: 1px solid rgba(0, 254, 165, 0.3); padding: 8px 12px; border-radius: 4px; color: #00FEA5; font-family: 'MonumentGroteskMono-Regular', Arial, sans-serif; font-size: 0.625rem; text-transform: uppercase; cursor: pointer; backdrop-filter: blur(10px); transition: all 0.3s ease;">Paramètres</button>
-
     <script type="importmap">
         {
             "imports": {
@@ -659,7 +475,6 @@
     <script src="https://unpkg.com/lenis@1.2.3/dist/lenis.min.js"></script> 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // Force le scroll en haut de la page au chargement
             window.scrollTo(0, 0);
             
             const lenis = new Lenis({
@@ -674,15 +489,10 @@
                 infinite: false,
             });
 
-            // Supprime l'ancien RAF de Lenis
-            // La mise à jour sera faite dans le RAF de Three.js
-            window.lenis = lenis; // Rend lenis accessible globalement
-            
-            // Force une réinitialisation de Lenis
+            window.lenis = lenis;
             lenis.scrollTo(0, { immediate: true });
         });
 
-        // Ajouter un gestionnaire pour le rechargement de la page
         window.addEventListener('beforeunload', () => {
             window.scrollTo(0, 0);
         });

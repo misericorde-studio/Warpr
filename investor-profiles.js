@@ -472,16 +472,16 @@ function updateParticlesOptimized(timestamp, scrollProgress) {
     particles.geometry.attributes.position.needsUpdate = true;
 }
 function calculateScrollProgress() {
-    const airdropSection = document.querySelector('.airdrop');
-    const airdropRect = airdropSection.getBoundingClientRect();
+    const investorSection = document.querySelector('.investor');
+    const investorRect = investorSection.getBoundingClientRect();
     const windowHeight = window.innerHeight;
     const startPoint = windowHeight * 0.9;
-    const sectionTop = airdropRect.top;
-    if (sectionTop > startPoint || airdropRect.bottom <= 0) {
+    const sectionTop = investorRect.top;
+    if (sectionTop > startPoint || investorRect.bottom <= 0) {
         return 0;
     }
-    const totalHeight = airdropRect.height - windowHeight;
-    const currentScroll = -airdropRect.top;
+    const totalHeight = investorRect.height - windowHeight;
+    const currentScroll = -investorRect.top;
     const scrollAtStart = -startPoint;
     const adjustedScroll = currentScroll - scrollAtStart;
     const adjustedTotal = totalHeight - scrollAtStart;
@@ -930,18 +930,18 @@ function updateClipPlane() {
     }
 }
 function updateScroll() {
-    const airdropSection = document.querySelector('.airdrop');
-    const airdropRect = airdropSection.getBoundingClientRect();
+    const investorSection = document.querySelector('.investor');
+    const investorRect = investorSection.getBoundingClientRect();
     const currentScrolled = window.scrollY;
     const windowHeight = window.innerHeight;
     const startPoint = windowHeight * 0.6;
-    const sectionTop = airdropRect.top;
-    if (sectionTop > startPoint || airdropRect.bottom <= 0) {
+    const sectionTop = investorRect.top;
+    if (sectionTop > startPoint || investorRect.bottom <= 0) {
         lastScrollY = currentScrolled;
         return;
     }
-    const totalHeight = airdropRect.height - windowHeight;
-    const currentScroll = -airdropRect.top;
+    const totalHeight = investorRect.height - windowHeight;
+    const currentScroll = -investorRect.top;
     const scrollAtStart = -startPoint;
     const adjustedScroll = currentScroll - scrollAtStart;
     const adjustedTotal = totalHeight - scrollAtStart;

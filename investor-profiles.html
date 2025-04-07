@@ -264,25 +264,6 @@
             gap: 1rem;
         }
 
-        .loading-progress-bar {
-            width: 100px;
-            height: 1px;
-            background-color: rgba(255, 255, 255, 0.2);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .loading-progress-bar::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: var(--progress, 14%);
-            background-color: #fff;
-            transition: width 0.3s ease;
-        }
-
         .loading-progress-value {
             color: #fff;
             min-width: 4rem;
@@ -414,7 +395,6 @@
             <div class="loading-indicator">
                 <div class="loading-text">PROGRESSION</div>
                 <div class="loading-progress">
-                    <div class="loading-progress-bar"></div>
                     <div class="loading-progress-value">[ 14% ]</div>
                 </div>
             </div>
@@ -486,8 +466,38 @@
                 infinite: false,
             });
 
+            const progressValue = document.querySelector('.loading-progress-value');
+
+            function updateProgress() {
+                const investorSection = document.querySelector('.investor');
+                const investorRect = investorSection.getBoundingClientRect();
+                const windowHeight = window.innerHeight;
+                const startPoint = windowHeight * 0.9;
+                const sectionTop = investorRect.top;
+
+                if (sectionTop > startPoint || investorRect.bottom <= 0) {
+                    progressValue.textContent = `[ 0% ]`;
+                    return;
+                }
+
+                const totalHeight = investorRect.height - windowHeight;
+                const currentScroll = -investorRect.top;
+                const scrollAtStart = -startPoint;
+                const adjustedScroll = currentScroll - scrollAtStart;
+                const adjustedTotal = totalHeight - scrollAtStart;
+                const progress = Math.min(100, Math.max(0, Math.round((adjustedScroll / adjustedTotal) * 100)));
+                
+                progressValue.textContent = `[ ${progress}% ]`;
+            }
+
+            function raf(time) {
+                lenis.raf(time);
+                updateProgress();
+                requestAnimationFrame(raf);
+            }
+
             window.lenis = lenis;
-            lenis.scrollTo(0, { immediate: true });
+            requestAnimationFrame(raf);
         });
 
         window.addEventListener('beforeunload', () => {

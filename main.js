@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const config = {
     innerRadius: 0.50,
     outerRadius: 4.80,
@@ -68,10 +67,7 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setClearColor(0x0C0E13, 1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.enabled = false;
+
 let particles;
 let innerParticles;
 let outerParticles;
@@ -81,11 +77,8 @@ let innerMaterial;
 let outerMaterial;
 let particlesGroup;
 let outerCircleGroup;
-let frameCount = 0;
-let lastTime = performance.now();
-let fpsTime = 0;
-const fpsUpdateInterval = 500;
 let hasScrolled = false;
+
 function init() {
     const canvasContainer = document.getElementById('canvas-container');
     if (canvasContainer) {
@@ -125,7 +118,6 @@ function init() {
         particlesGroup.add(innerParticlesObject);
         particlesGroup.rotation.x = THREE.MathUtils.degToRad(scrollConfig.startRotationX);
         scene.add(particlesGroup);
-        controls.enabled = false;
         animate();
     }
 }
@@ -740,63 +732,6 @@ function updateRendererSize() {
     }
 }
 window.addEventListener('resize', updateRendererSize);
-function updateCameraInfo() {
-    const rotationXElement = document.getElementById('rotation-x');
-    const rotationYElement = document.getElementById('rotation-y');
-    const rotationZElement = document.getElementById('rotation-z');
-    const distanceElement = document.getElementById('camera-distance');
-    const distance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
-    const sections = document.querySelectorAll('.airdrop_content');
-    let scrollProgress = 0;
-    if (sections.length >= 2) {
-        const secondSection = sections[1];
-        const secondSectionRect = secondSection.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        scrollProgress = 1 - (secondSectionRect.top / viewportHeight);
-        scrollProgress = Math.max(0, Math.min(1, scrollProgress));
-    }
-    const rotX = scrollConfig.startRotationX + 
-                (scrollConfig.endRotationX - scrollConfig.startRotationX) * scrollProgress;
-    if (rotationXElement && rotationYElement && rotationZElement && distanceElement) {
-        rotationXElement.textContent = rotX.toFixed(2);
-        rotationYElement.textContent = "0.00";
-        rotationZElement.textContent = "-180.00";
-        distanceElement.textContent = distance.toFixed(2);
-    }
-}
-function formatMemorySize(bytes) {
-    return (bytes / 1024 / 1024).toFixed(2);
-}
-function updatePerformanceStats(currentTime) {
-    const deltaTime = currentTime - lastTime;
-    lastTime = currentTime;
-    frameCount++;
-    fpsTime += deltaTime;
-    if (fpsTime >= fpsUpdateInterval) {
-        const fps = Math.round((frameCount * 1000) / fpsTime);
-        const frameTime = (fpsTime / frameCount).toFixed(2);
-        const activeParticles = particles.filter(p => p.active).length;
-        const fpsElement = document.getElementById('fps-value');
-        const frameTimeElement = document.getElementById('frame-time-value');
-        const particlesElement = document.getElementById('particles-value');
-        const memoryElement = document.getElementById('memory-value');
-        if (fpsElement) {
-            fpsElement.textContent = fps;
-        }
-        if (frameTimeElement) {
-            frameTimeElement.textContent = `${frameTime} ms`;
-        }
-        if (particlesElement) {
-            particlesElement.textContent = activeParticles;
-        }
-        if (window.performance && window.performance.memory && memoryElement) {
-            const memory = formatMemorySize(window.performance.memory.usedJSHeapSize);
-            memoryElement.textContent = `${memory} MB`;
-        }
-        frameCount = 0;
-        fpsTime = 0;
-    }
-}
 function animate() {
     requestAnimationFrame(animate);
     let shrinkProgress = 0;
@@ -884,7 +819,7 @@ function animate() {
         outerGeometry.attributes.opacity.array[i] = particle.opacity;
     });
     const minMobileParticles = Math.floor(config.outerCircleParticles * config.minMobileRatio);
-    if (movingCount < minMobileParticles && frameCount % 10 === 0) {
+    if (movingCount < minMobileParticles) {
         const particlesToConvert = Math.min(50, minMobileParticles - movingCount);
         let resetCount = 0;
         for (let i = 0; i < outerParticles.length && resetCount < particlesToConvert; i++) {
@@ -907,7 +842,6 @@ function animate() {
     outerGeometry.attributes.color.needsUpdate = true;
     outerGeometry.attributes.opacity.needsUpdate = true;
     renderer.render(scene, camera);
-    updatePerformanceStats(performance.now());
 }
 document.addEventListener('DOMContentLoaded', () => {
     updateRendererSize();
